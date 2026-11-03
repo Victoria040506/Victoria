@@ -169,8 +169,8 @@ header .nav button{font-size:12px;padding:10px 9px}
 </section>
 <section id="page-cloud" class="hidden">
  <div class="sectiontitle"><div><div class="eyebrow">READ EVERYWHERE</div><h2>Cloud Sync ☁️</h2><p class="sub">Optional private account — synchronize your book records and journal across devices.</p></div></div>
- <div class="two section"><div class="panel journal-panel"><h3>1. Connect a Supabase project</h3><p class="sub">Paste your new project's URL and <strong>publishable key</strong>. Never enter a service-role or secret key.</p><label>Project URL<input type="url" id="sbUrl" placeholder="https://your-project.supabase.co"></label><label>Publishable key<input type="text" id="sbKey" placeholder="sb_publishable_..."></label><button class="primary" onclick="connectCloud()">Connect project</button><p id="cloudConn" class="sub"></p></div>
- <div class="panel journal-panel"><h3>2. Sign in & synchronize</h3><label>Email<input type="email" id="cloudEmail" autocomplete="email" placeholder="you@example.com"></label><label>Password<input type="password" id="cloudPassword" autocomplete="current-password" placeholder="Your password"></label><div class="cloud-actions"><button onclick="cloudSignUp()">Create account</button><button onclick="cloudSignIn()">Sign in</button><button onclick="cloudSignOut()">Sign out</button></div><div class="cloud-actions"><button class="primary" onclick="cloudUpload()">↑ Upload my library</button><button onclick="cloudDownload()">↓ Restore cloud copy</button></div><p id="cloudState" class="sub" aria-live="polite">Not connected. Local saving works independently.</p></div></div>
+ <div class="two section"><div class="panel journal-panel"><h3>1. Blue Shelf cloud connection 🩵</h3><p class="sub">Your Blue Shelf Supabase project is already configured. You only need to create an account or sign in. Original ebook files stay on your device.</p><label>Project URL<input type="url" id="sbUrl" placeholder="https://your-project.supabase.co"></label><label>Publishable key<input type="text" id="sbKey" placeholder="sb_publishable_..."></label><button class="primary" onclick="connectCloud()">Reconnect if needed</button><p id="cloudConn" class="sub"></p></div>
+ <div class="panel journal-panel"><h3>2. Sign in & synchronize</h3><p class="sub">After signing in, import your latest JSON backup in My Library, then choose “Upload my library” once. On your second device, sign in and choose “Restore cloud copy”.</p><label>Email<input type="email" id="cloudEmail" autocomplete="email" placeholder="you@example.com"></label><label>Password<input type="password" id="cloudPassword" autocomplete="current-password" placeholder="Your password"></label><div class="cloud-actions"><button onclick="cloudSignUp()">Create account</button><button onclick="cloudSignIn()">Sign in</button><button onclick="cloudSignOut()">Sign out</button></div><div class="cloud-actions"><button class="primary" onclick="cloudUpload()">↑ Upload my library</button><button onclick="cloudDownload()">↓ Restore cloud copy</button></div><p id="cloudState" class="sub" aria-live="polite">Not connected. Local saving works independently.</p></div></div>
  <div class="panel journal-panel" style="margin-top:18px"><strong>🔒 Privacy:</strong> Each signed-in user can access only their own records when you install the included RLS database schema. Original EPUB/PDF file contents stay on this device; only catalog details, small covers and journal notes can sync. Do not upload until you've installed the database schema and checked your account.</div>
 </section>
 
@@ -541,6 +541,9 @@ setTimeout(bulkNotice,0);
 
 /* Blue Shelf reading journal, virtual shelves, file import & optional cloud sync */
 const JOURNAL_KEY='blue-shelf-journal-v1', CLOUD_KEY='blue-shelf-cloud-config-v1', READER_KEY='blue-shelf-reader-v1';
+// Public, browser-safe Supabase project configuration (never add a secret/service_role key).
+const BLUE_SHELF_SUPABASE_URL='https://xnusihuofvkhtrosoptd.supabase.co', BLUE_SHELF_SUPABASE_PUBLISHABLE_KEY='sb_publishable_7ZbL9VN0mY_oTzcUyccb7A__8CpWp81';
+try{localStorage.setItem(CLOUD_KEY,JSON.stringify({url:BLUE_SHELF_SUPABASE_URL,key:BLUE_SHELF_SUPABASE_PUBLISHABLE_KEY}))}catch(e){console.warn('Could not cache cloud settings',e)}
 let journal={};try{journal=JSON.parse(localStorage.getItem(JOURNAL_KEY)||'{}')||{}}catch{};
 function safeText(s){return esc(String(s??''))}
 function persistJournal(){try{localStorage.setItem(JOURNAL_KEY,JSON.stringify(journal));scheduleCloudSave()}catch(e){alert('Journal could not be stored; export your backup.')}}
@@ -587,7 +590,7 @@ function statusCloud(msg){const p=document.getElementById('cloudState');if(p)p.t
 function configCloud(){try{return JSON.parse(localStorage.getItem(CLOUD_KEY)||'{}')}catch{return {}}}
 function renderCloud(){const c=configCloud();document.getElementById('sbUrl').value=c.url||'';document.getElementById('sbKey').value=c.key||'';document.getElementById('cloudConn').textContent=supa?'✓ Cloud client ready':'Optional cloud setup is not connected';statusCloud(cloudUser?'Signed in as '+cloudUser.email:'Not signed in. All local changes stay in this browser.')}
 async function connectCloud(fromSaved=false){try{const c=fromSaved?configCloud():{url:document.getElementById('sbUrl').value.trim(),key:document.getElementById('sbKey').value.trim()};const u=new URL(c.url);if(u.protocol!=='https:'||!u.hostname.endsWith('.supabase.co'))throw new Error('Please enter a valid https://...supabase.co project URL');if(!c.key||/service_role|sb_secret_/.test(c.key))throw new Error('Only publishable/anon keys are allowed. Never paste secret keys.');await loadExternalScript(SUPA_URL,'supabase');supa=window.supabase.createClient(c.url,c.key,{auth:{persistSession:true,autoRefreshToken:true}});localStorage.setItem(CLOUD_KEY,JSON.stringify(c));const {data,error}=await supa.auth.getUser();if(error&&error.name!=='AuthSessionMissingError')throw error;cloudUser=data?.user||null;cloudEnabled=!!(cloudUser&&localStorage.getItem('blue-shelf-cloud-enabled-'+cloudUser.id)==='1');document.getElementById('cloudConn').textContent='✓ Connected to '+u.hostname;statusCloud(cloudUser?'Signed in as '+cloudUser.email:'Connected. Sign in to enable private sync.');return true}catch(e){statusCloud('Connection error: '+e.message);return false}}
-async function cloudSignUp(){try{if(!supa)throw new Error('Connect a project first');const email=document.getElementById('cloudEmail').value.trim(),password=document.getElementById('cloudPassword').value;const {data,error}=await supa.auth.signUp({email,password});if(error)throw error;cloudUser=data?.user||null;statusCloud(data?.session?'Account created and signed in.':'Please check your email to confirm your account, then sign in.')}catch(e){statusCloud(e.message)}}
+async function cloudSignUp(){try{if(!supa)throw new Error('Connect a project first');const email=document.getElementById('cloudEmail').value.trim(),password=document.getElementById('cloudPassword').value;const {data,error}=await supa.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname}});if(error)throw error;cloudUser=data?.user||null;statusCloud(data?.session?'Account created and signed in.':'Please check your email to confirm your account, then sign in.')}catch(e){statusCloud(e.message)}}
 async function cloudSignIn(){try{if(!supa)throw new Error('Connect a project first');const {data,error}=await supa.auth.signInWithPassword({email:document.getElementById('cloudEmail').value.trim(),password:document.getElementById('cloudPassword').value});if(error)throw error;cloudUser=data.user;cloudEnabled=localStorage.getItem('blue-shelf-cloud-enabled-'+cloudUser.id)==='1';statusCloud('✓ Signed in as '+cloudUser.email+'. Choose Upload or Restore to select the initial source of truth.')}catch(e){statusCloud(e.message)}}
 async function cloudSignOut(){if(supa)await supa.auth.signOut();cloudUser=null;cloudEnabled=false;statusCloud('Signed out. Local saves still work.');}
 function booksForCloud(){return books.map(b=>({...b,cover:b.cover||(typeof EMBEDDED_COVERS!=='undefined'?EMBEDDED_COVERS[b.id]:'')||''}))}
@@ -637,7 +640,53 @@ const bsOriginalOpenReader=openReader;openReader=async function(id){await bsOrig
 const bsOriginalRenderJournal=renderJournal;renderJournal=function(){bsOriginalRenderJournal();renderReadingSessions()};
 const bsOriginalExport=exportData;exportData=function(){let data={version:2,exportedAt:new Date().toISOString(),goal:getGoal(),books:booksForCloud(),journal,sessions:readingSessions,customShelves,challengeGoals,readerMarks,readerSettings};const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='blue-shelf-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)};
 const bsOriginalImport=importData;importData=async function(ev){const file=ev.target.files?.[0];if(!file)return;let extra=null;try{extra=JSON.parse(await file.text())}catch{};const ok=await bsOriginalImport(ev);if(!ok)return;if(extra&&Array.isArray(extra.sessions)){const byId=new Map(readingSessions.map(s=>[s.id,s]));for(const s of extra.sessions)if(s?.id&&s?.bookId&&/^\d{4}-\d{2}-\d{2}$/.test(s.date||''))byId.set(s.id,{id:String(s.id),bookId:String(s.bookId),date:s.date,minutes:Math.max(0,Number(s.minutes)||0),pages:Math.max(0,Number(s.pages)||0),note:String(s.note||'').slice(0,280)});readingSessions=[...byId.values()];bsWrite(BS_SESSIONS,readingSessions)}if(extra&&extra.customShelves&&typeof extra.customShelves==='object'&&!Array.isArray(extra.customShelves)){for(const [name,ids] of Object.entries(extra.customShelves)){if(Array.isArray(ids))customShelves[name]=[...new Set([...(customShelves[name]||[]),...ids.filter(x=>typeof x==='string')])]}bsWrite(BS_SHELVES,customShelves)}if(extra?.challengeGoals){challengeGoals={...challengeGoals,...extra.challengeGoals};bsWrite(BS_CHALLENGES,challengeGoals)}if(extra?.readerMarks){readerMarks={...readerMarks,...extra.readerMarks};bsWrite(BS_READER_MARKS,readerMarks)}};
-const bsOriginalCloudUpload=cloudUpload;cloudUpload=async function(silent=false){if(!supa||!cloudUser)return bsOriginalCloudUpload(silent);try{let data={user_id:cloudUser.id,books:booksForCloud(),journal,goal:getGoal(),sessions:readingSessions,custom_shelves:customShelves,challenge_goals:challengeGoals,updated_at:new Date().toISOString()};let result=await supa.from('blue_shelf_user_data').upsert(data,{onConflict:'user_id'});if(result.error){delete data.sessions;delete data.custom_shelves;delete data.challenge_goals;result=await supa.from('blue_shelf_user_data').upsert(data,{onConflict:'user_id'})}if(result.error)throw result.error;cloudEnabled=true;localStorage.setItem('blue-shelf-cloud-enabled-'+cloudUser.id,'1');statusCloud('✓ Saved to cloud '+new Date().toLocaleTimeString())}catch(e){statusCloud('Cloud save failed: '+e.message)}};
+// Synchronize all Blue Shelf v2 settings within the existing, RLS-protected JSON snapshot.
+// Uses the four columns already created in SQL Editor; no extra schema permissions are required.
+cloudUpload=async function(silent=false){
+ if(!supa||!cloudUser){if(!silent)statusCloud('Sign in first.');return}
+ try{
+  const snapshot={...journal,__blue_shelf_v2:{sessions:readingSessions,customShelves,challengeGoals,readerMarks}};
+  const row={user_id:cloudUser.id,books:booksForCloud(),journal:snapshot,goal:getGoal(),updated_at:new Date().toISOString()};
+  const {error}=await supa.from('blue_shelf_user_data').upsert(row,{onConflict:'user_id'});
+  if(error)throw error;
+  cloudEnabled=true;
+  localStorage.setItem('blue-shelf-cloud-enabled-'+cloudUser.id,'1');
+  statusCloud('✓ Cloud saved '+new Date().toLocaleTimeString()+'. EPUB/PDF contents remain on this device.');
+ }catch(e){statusCloud('Cloud save failed: '+e.message+'. Your local library is unchanged.')}
+};
+cloudDownload=async function(){
+ if(!supa||!cloudUser){statusCloud('Sign in first.');return}
+ try{
+  const {data,error}=await supa.from('blue_shelf_user_data').select('books,journal,goal,updated_at').eq('user_id',cloudUser.id).maybeSingle();
+  if(error)throw error;
+  if(!data){statusCloud('No cloud library yet. Import your JSON backup, then click Upload my library.');return}
+  if(!confirm('Restore your private cloud library on this device? Books will be merged by ID and cloud records will replace matching local records. Export a local backup first.'))return;
+  const byId=new Map(books.map(b=>[b.id,b]));
+  for(const b of (Array.isArray(data.books)?data.books:[]))if(b?.id)byId.set(b.id,b);
+  books=[...byId.values()];
+  const savedJournal=data.journal&&typeof data.journal==='object'?data.journal:{};
+  const extra=savedJournal.__blue_shelf_v2||{};
+  const cleanedJournal={...savedJournal};delete cleanedJournal.__blue_shelf_v2;
+  journal={...journal,...cleanedJournal};
+  localStorage.setItem(JOURNAL_KEY,JSON.stringify(journal));
+  if(Array.isArray(extra.sessions)){
+   const sessionsById=new Map(readingSessions.map(s=>[s.id,s]));
+   for(const s of extra.sessions)if(s?.id&&s?.bookId)sessionsById.set(s.id,s);
+   readingSessions=[...sessionsById.values()];bsWrite(BS_SESSIONS,readingSessions);
+  }
+  if(extra.customShelves&&typeof extra.customShelves==='object'&&!Array.isArray(extra.customShelves)){
+   for(const [name,ids] of Object.entries(extra.customShelves))if(Array.isArray(ids))customShelves[name]=[...new Set([...(customShelves[name]||[]),...ids])];
+   bsWrite(BS_SHELVES,customShelves);
+  }
+  if(extra.challengeGoals&&typeof extra.challengeGoals==='object'){challengeGoals={...challengeGoals,...extra.challengeGoals};bsWrite(BS_CHALLENGES,challengeGoals)}
+  if(extra.readerMarks&&typeof extra.readerMarks==='object'){readerMarks={...readerMarks,...extra.readerMarks};bsWrite(BS_READER_MARKS,readerMarks)}
+  if(data.goal)localStorage.setItem(GOAL,String(data.goal));
+  cloudEnabled=true;localStorage.setItem('blue-shelf-cloud-enabled-'+cloudUser.id,'1');
+  store();go('library');
+  statusCloud('✓ Restored '+(data.books?.length||0)+' books and reading journal from your private cloud.');
+ }catch(e){statusCloud('Cloud restore failed: '+e.message)}
+};
+
 if($('sessionDate'))$('sessionDate').value=bsToday();
 
 // blue-shelf-v2
