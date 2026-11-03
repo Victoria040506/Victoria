@@ -168,9 +168,9 @@ header .nav button{font-size:12px;padding:10px 9px}
  <div class="two section"><div class="panel journal-panel"><h3>📂 Add your books</h3><p class="sub">EPUB title, author and cover are read automatically when available; PDF metadata may be limited. Files never get uploaded to a server.</p><input type="file" id="ebookFiles" accept=".epub,.pdf,application/epub+zip,application/pdf" multiple><div style="margin-top:14px"><button class="primary" onclick="importEbooks()">Import selected files</button></div><p id="fileProgress" class="sub" aria-live="polite"></p></div><div class="panel journal-panel"><h3>📖 Your on-device reader</h3><p class="sub">Click Read to open a stored EPUB or PDF. Your last EPUB location will be remembered in this browser.</p><div id="myLocalFiles"></div></div></div>
 </section>
 <section id="page-cloud" class="hidden">
- <div class="sectiontitle"><div><div class="eyebrow">READ EVERYWHERE</div><h2>Cloud Sync ☁️</h2><p class="sub">Optional private account — synchronize your book records and journal across devices.</p></div></div>
+ <div class="sectiontitle"><div><div class="eyebrow">READ EVERYWHERE</div><h2>Cloud Sync ☁️</h2><p class="sub">Automatic two-way synchronization after sign-in. Book records and journal update across devices; ebook files stay local.</p></div></div>
  <div class="two section"><div class="panel journal-panel"><h3>1. Blue Shelf cloud connection 🩵</h3><p class="sub">Your Blue Shelf Supabase project is already configured. You only need to create an account or sign in. Original ebook files stay on your device.</p><label>Project URL<input type="url" id="sbUrl" placeholder="https://your-project.supabase.co"></label><label>Publishable key<input type="text" id="sbKey" placeholder="sb_publishable_..."></label><button class="primary" onclick="connectCloud()">Reconnect if needed</button><p id="cloudConn" class="sub"></p></div>
- <div class="panel journal-panel"><h3>2. Sign in & synchronize</h3><p class="sub">After signing in, import your latest JSON backup in My Library, then choose “Upload my library” once. On your second device, sign in and choose “Restore cloud copy”.</p><label>Email<input type="email" id="cloudEmail" autocomplete="email" placeholder="you@example.com"></label><label>Password<input type="password" id="cloudPassword" autocomplete="current-password" placeholder="Your password"></label><div class="cloud-actions"><button onclick="cloudSignUp()">Create account</button><button onclick="cloudSignIn()">Sign in</button><button onclick="cloudSignOut()">Sign out</button></div><div class="cloud-actions"><button class="primary" onclick="cloudUpload()">↑ Upload my library</button><button onclick="cloudDownload()">↓ Restore cloud copy</button></div><p id="cloudState" class="sub" aria-live="polite">Not connected. Local saving works independently.</p></div></div>
+ <div class="panel journal-panel"><h3>2. Sign in & synchronize</h3><p class="sub">Your library now syncs automatically after sign-in. Changes upload after a short pause, and other devices refresh when you return to the tab. Keep an occasional JSON backup.</p><label>Email<input type="email" id="cloudEmail" autocomplete="email" placeholder="you@example.com"></label><label>Password<input type="password" id="cloudPassword" autocomplete="current-password" placeholder="Your password"></label><div class="cloud-actions"><button onclick="cloudSignUp()">Create account</button><button onclick="cloudSignIn()">Sign in</button><button onclick="cloudSignOut()">Sign out</button></div><div class="cloud-actions"><button class="primary" onclick="cloudUpload()">↑ Upload my library</button><button onclick="cloudDownload()">↓ Restore cloud copy</button></div><p id="cloudState" class="sub" aria-live="polite">Not connected. Local saving works independently.</p></div></div>
  <div class="panel journal-panel" style="margin-top:18px"><strong>🔒 Privacy:</strong> Each signed-in user can access only their own records when you install the included RLS database schema. Original EPUB/PDF file contents stay on this device; only catalog details, small covers and journal notes can sync. Do not upload until you've installed the database schema and checked your account.</div>
 </section>
 
@@ -690,6 +690,175 @@ cloudDownload=async function(){
 if($('sessionDate'))$('sessionDate').value=bsToday();
 
 // blue-shelf-v2
+/* Blue Shelf automatic, conflict-aware cloud synchronization.
+   The remote library is never replaced by an empty local copy on startup. */
+let bsCloudApplying=false, bsCloudBusy=false, bsCloudPending=false;
+let bsCloudCheckedAt=0, bsCloudRemoteVersion='', bsCloudSessionUser='';
+const bsCloudDirtyKey=id=>'blue-shelf-cloud-dirty-'+id;
+const bsCloudSeenKey=id=>'blue-shelf-cloud-version-'+id;
+const bsCloudStatus=(s)=>{statusCloud(s); if(document.querySelector('[data-nav="cloud"].active'))updateSaveState(s)};
+function bsCloudMarkSynced(userId,date){
+ bsCloudRemoteVersion=date||new Date().toISOString();
+ try{localStorage.setItem(bsCloudSeenKey(userId),bsCloudRemoteVersion);localStorage.removeItem(bsCloudDirtyKey(userId));}catch{}
+ bsCloudPending=false;
+}
+function bsCloudRestore(data){
+ bsCloudApplying=true;
+ try{
+  const incoming=Array.isArray(data.books)?data.books.filter(b=>b&&typeof b.id==='string'):[];
+  if(incoming.length===0 && books.length>0){
+   bsCloudStatus('The cloud collection is empty; keeping your '+books.length+' local books. Upload manually only if you want to replace it.');
+   return false;
+  }
+  books=incoming;
+  localStorage.setItem(KEY,JSON.stringify(books));
+  const allJournal=data.journal&&typeof data.journal==='object'?data.journal:{};
+  const extras=allJournal.__blue_shelf_v2||{};
+  journal={...allJournal};delete journal.__blue_shelf_v2;
+  localStorage.setItem(JOURNAL_KEY,JSON.stringify(journal));
+  readingSessions=Array.isArray(extras.sessions)?extras.sessions:[];
+  customShelves=extras.customShelves&&typeof extras.customShelves==='object'&&!Array.isArray(extras.customShelves)?extras.customShelves:{};
+  challengeGoals=extras.challengeGoals&&typeof extras.challengeGoals==='object'?{...challengeGoals,...extras.challengeGoals}:challengeGoals;
+  readerMarks=extras.readerMarks&&typeof extras.readerMarks==='object'?extras.readerMarks:readerMarks;
+  localStorage.setItem(BS_SESSIONS,JSON.stringify(readingSessions));
+  localStorage.setItem(BS_SHELVES,JSON.stringify(customShelves));
+  localStorage.setItem(BS_CHALLENGES,JSON.stringify(challengeGoals));
+  localStorage.setItem(BS_READER_MARKS,JSON.stringify(readerMarks));
+  if(Number(data.goal)>0)localStorage.setItem(GOAL,String(data.goal));
+  const selected=document.querySelector('[data-nav].active')?.dataset.nav||'home';
+  go(selected);
+  return true;
+ } finally {bsCloudApplying=false;}
+}
+async function bsCloudRead({startup=false}={}){
+ if(!supa||!cloudUser||bsCloudBusy)return;
+ bsCloudBusy=true;
+ try{
+  const {data,error}=await supa.from('blue_shelf_user_data').select('books,journal,goal,updated_at').eq('user_id',cloudUser.id).maybeSingle();
+  if(error)throw error;
+  bsCloudCheckedAt=Date.now();
+  if(!data){
+   bsCloudRemoteVersion='';
+   bsCloudStatus(books.length?'Cloud is empty; your local books are safe. Use Upload my library once to initialize it.':'Signed in. Cloud is empty; add or import books to get started.');
+   return;
+  }
+  const seen=localStorage.getItem(bsCloudSeenKey(cloudUser.id))||'';
+  const dirty=!!localStorage.getItem(bsCloudDirtyKey(cloudUser.id));
+  if(dirty||bsCloudPending){
+   bsCloudStatus('Local changes are waiting to sync. Cloud data was not overwritten.');
+   return;
+  }
+  const remoteIds=new Set((Array.isArray(data.books)?data.books:[]).map(b=>b?.id));
+  const extraLocal=books.filter(b=>!remoteIds.has(b.id));
+  if(extraLocal.length && books.length && !seen){
+   bsCloudStatus('Local library has '+extraLocal.length+' book(s) not in the cloud. Export a backup, then use Upload or Restore to choose which version to keep.');
+   return;
+  }
+  if(!startup&&seen && data.updated_at && data.updated_at<=seen){
+   bsCloudRemoteVersion=data.updated_at;
+   return;
+  }
+  const restored=bsCloudRestore(data);
+  if(restored){
+   bsCloudMarkSynced(cloudUser.id,data.updated_at);
+   cloudEnabled=true;
+   localStorage.setItem('blue-shelf-cloud-enabled-'+cloudUser.id,'1');
+   bsCloudStatus('✓ Automatically synced '+books.length+' books from cloud · '+new Date().toLocaleTimeString());
+  }
+ }catch(e){bsCloudStatus('Automatic cloud download failed: '+e.message+'. Local data stays safe.');}
+ finally{bsCloudBusy=false;}
+}
+async function bsCloudPush({manual=false}={}){
+ if(!supa||!cloudUser){if(manual)bsCloudStatus('Please sign in first.');return false;}
+ if(bsCloudBusy){if(manual)bsCloudStatus('Synchronization is already in progress.');return false;}
+ bsCloudBusy=true;
+ try{
+  const {data:remote,error:readErr}=await supa.from('blue_shelf_user_data').select('books,updated_at').eq('user_id',cloudUser.id).maybeSingle();
+  if(readErr)throw readErr;
+  const lastSeen=localStorage.getItem(bsCloudSeenKey(cloudUser.id))||'';
+  const remoteVersion=remote?.updated_at||'';
+  if(remote && remoteVersion && lastSeen && remoteVersion>lastSeen){
+   bsCloudStatus('⚠️ Newer changes exist on another device. No upload occurred. Export a backup and restore the cloud version before editing.');
+   return false;
+  }
+  if(remote && !lastSeen && Array.isArray(remote.books) && remote.books.length){
+   bsCloudStatus('⚠️ Cloud data already exists. Download the cloud library first before uploading changes from this device.');
+   return false;
+  }
+  if(!manual && books.length===0 && Array.isArray(remote?.books) && remote.books.length)return false;
+  const stamp=new Date().toISOString();
+  const snapshot={...journal,__blue_shelf_v2:{sessions:readingSessions,customShelves,challengeGoals,readerMarks}};
+  const payload={user_id:cloudUser.id,books:booksForCloud(),journal:snapshot,goal:getGoal(),updated_at:stamp};
+  const {error}=await supa.from('blue_shelf_user_data').upsert(payload,{onConflict:'user_id'});
+  if(error)throw error;
+  bsCloudMarkSynced(cloudUser.id,stamp);
+  cloudEnabled=true;
+  localStorage.setItem('blue-shelf-cloud-enabled-'+cloudUser.id,'1');
+  bsCloudStatus('✓ Automatically saved '+books.length+' books to cloud · '+new Date().toLocaleTimeString());
+  return true;
+ }catch(e){bsCloudStatus('Cloud save failed: '+e.message+'. Your local changes are still saved.');return false;}
+ finally{bsCloudBusy=false;}
+}
+// Keep legacy buttons working; all changes now schedule a guarded upload.
+cloudUpload=async function(){return bsCloudPush({manual:true})};
+scheduleCloudSave=function(){
+ if(bsCloudApplying||!supa||!cloudUser)return;
+ bsCloudPending=true;
+ try{localStorage.setItem(bsCloudDirtyKey(cloudUser.id),String(Date.now()))}catch{}
+ clearTimeout(cloudTimer);
+ cloudTimer=setTimeout(async()=>{
+  if(bsCloudBusy){scheduleCloudSave();return;}
+  await bsCloudPush();
+ },2500);
+};
+cloudDownload=async function(){
+ if(!supa||!cloudUser){bsCloudStatus('Sign in first.');return;}
+ if(books.length>0&&!confirm('Replace local book records with the most recent cloud copy? Export a backup first if you have unsynced changes.'))return;
+ if(bsCloudBusy){bsCloudStatus('Another sync is running.');return;}
+ bsCloudPending=false;
+ try{localStorage.removeItem(bsCloudDirtyKey(cloudUser.id))}catch{}
+ await bsCloudRead({startup:true});
+};
+async function bsCloudStart(){
+ if(!cloudUser||!supa)return;
+ if(bsCloudSessionUser===cloudUser.id&&bsCloudCheckedAt)return;
+ bsCloudSessionUser=cloudUser.id;
+ bsCloudPending=!!localStorage.getItem(bsCloudDirtyKey(cloudUser.id));
+ cloudEnabled=true;
+ localStorage.setItem('blue-shelf-cloud-enabled-'+cloudUser.id,'1');
+ // Fetch before enabling new uploads. Old devices may have unrelated local data.
+ await bsCloudRead({startup:true});
+ if(bsCloudPending)bsCloudStatus('Unsynced local changes found. Export a backup and review before replacing cloud data.');
+}
+const bsOriginalConnectCloud=connectCloud;
+connectCloud=async function(...args){const ok=await bsOriginalConnectCloud(...args);if(ok&&cloudUser)await bsCloudStart();return ok;};
+const bsOriginalSignIn=cloudSignIn;
+cloudSignIn=async function(...args){await bsOriginalSignIn(...args);if(cloudUser)await bsCloudStart();};
+const bsOriginalSignOut=cloudSignOut;
+cloudSignOut=async function(...args){clearTimeout(cloudTimer);bsCloudSessionUser='';bsCloudCheckedAt=0;bsCloudPending=false;await bsOriginalSignOut(...args);};
+// Check for changes on other devices when this tab regains focus and periodically while open.
+async function bsCloudCheck(){if(document.visibilityState==='hidden'||!cloudUser||!supa||bsCloudPending||bsCloudBusy)return;if(Date.now()-bsCloudCheckedAt<25000)return;await bsCloudRead();}
+window.addEventListener('focus',bsCloudCheck);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')bsCloudCheck()});
+setInterval(bsCloudCheck,60000);
+// connectCloud() was originally started earlier in this script; an already authenticated
+// client might resolve before its wrapper is installed. Pick it up here as well.
+if(cloudUser&&supa)bsCloudStart();
+// The original startup connection can finish asynchronously after this patch loads.
+// Listen for its completion without changing the auth configuration.
+const bsCloudAuthObserver=setInterval(()=>{
+ if(!supa)return;
+ clearInterval(bsCloudAuthObserver);
+ supa.auth.onAuthStateChange((event,session)=>{
+  if((event==='INITIAL_SESSION'||event==='SIGNED_IN')&&session?.user){
+   cloudUser=session.user;
+   setTimeout(()=>bsCloudStart(),0);
+  }
+  if(event==='SIGNED_OUT'){bsCloudSessionUser='';bsCloudCheckedAt=0;bsCloudPending=false;cloudUser=null;}
+ });
+ if(cloudUser)bsCloudStart();
+},500);
+
 </script>
 </body>
 </html>
