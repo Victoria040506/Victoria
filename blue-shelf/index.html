@@ -172,7 +172,7 @@ html.bs-authenticated #bs-auth-gate{display:none !important}
 .bs-reading-day{border:1px solid #e3ebf0;border-radius:10px;text-align:center;padding:10px 2px;font-size:11px;background:#f7f9fb;color:#8296a6}
 .bs-reading-day.active{background:#dce9d9;border-color:#c4ddc4;color:#4f7b61}.bs-reading-day.today{outline:2px solid #acc9e5}
 @media(max-width:530px){.bs-stats-month-bars{gap:4px}.bs-stats-day-grid{gap:4px}.bs-reading-day{padding:8px 0}}
-</style><style id="bs-bingo-styles">.bs-bingo-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;margin:15px 0}.bs-bingo-square{min-height:99px;border-radius:18px;border:1px solid #dbe8ef;background:linear-gradient(155deg,#f9fcff,#fdf4f9);padding:14px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:7px;color:#617d95;font:600 13px 'DM Sans',sans-serif;cursor:pointer}.bs-bingo-square span{font-size:23px}.bs-bingo-square.done{background:linear-gradient(135deg,#dff1e7,#eaf2ff);border-color:#9bc9b2;color:#40755d;box-shadow:inset 0 0 0 2px #c6e7d5}.bs-bingo-square:focus-visible{outline:3px solid #83abc7}@media(max-width:460px){.bs-bingo-grid{gap:6px}.bs-bingo-square{font-size:11px;padding:10px 5px;min-height:85px}}</style></head>
+</style><style id="bs-bingo-styles">.bs-bingo-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;margin:15px 0}.bs-bingo-square{min-height:99px;border-radius:18px;border:1px solid #dbe8ef;background:linear-gradient(155deg,#f9fcff,#fdf4f9);padding:14px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:7px;color:#617d95;font:600 13px 'DM Sans',sans-serif;cursor:pointer}.bs-bingo-square span{font-size:23px}.bs-bingo-square.done{background:linear-gradient(135deg,#dff1e7,#eaf2ff);border-color:#9bc9b2;color:#40755d;box-shadow:inset 0 0 0 2px #c6e7d5}.bs-bingo-square:focus-visible{outline:3px solid #83abc7}@media(max-width:460px){.bs-bingo-grid{gap:6px}.bs-bingo-square{font-size:11px;padding:10px 5px;min-height:85px}}</style><style id="bs-reader-plus-css">#bs-reader-extras{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:8px 14px;background:#f5f9fc;color:#7893a8;font-size:12px}#bs-reader-extras button{border:1px solid #dce7f0;border-radius:12px;padding:7px 10px;background:#fff7fb;color:#62819a;cursor:pointer}#bs-reader-highlights[hidden]{display:none!important}#bs-reader-highlights{max-height:190px;overflow:auto;padding:12px 18px;background:#fffdfb;border-top:1px solid #e6edf2}#bs-reader-highlights-list{display:grid;gap:7px}.bs-highlight-item{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 10px;background:#f7f9fb;border-radius:10px}.bs-highlight-item button{background:#e9f2f8;border:0;border-radius:8px;padding:6px;cursor:pointer;color:#577891}.bs-highlight-item .bs-highlight-text{flex:1;min-width:0;font-size:12px;color:#557086}</style></head>
 <body>
 
 <div id="bs-auth-gate" role="region" aria-label="Blue Shelf sign in">
@@ -266,7 +266,7 @@ html.bs-authenticated #bs-auth-gate{display:none !important}
 <button onclick="readerSetFont(-10)" title="Smaller font">A−</button><button onclick="readerSetFont(10)" title="Larger font">A＋</button>
 <select id="readerTheme" aria-label="Reader theme" onchange="readerChangeTheme(this.value)"><option value="light">Cream</option><option value="sepia">Sepia</option><option value="dark">Dark</option></select>
 <button id="readerBookmark" onclick="readerSaveBookmark()">♡ Bookmark</button><button onclick="readerReturnBookmark()">↪ Go to bookmark</button>
-<button onclick="readerPrev()">←</button><button onclick="readerNext()">→</button><button onclick="closeReader()">✕ Close</button></div></div><div id="readerView"></div></div></div>
+<button onclick="readerPrev()">←</button><button onclick="readerNext()">→</button><button onclick="closeReader()">✕ Close</button></div></div><div id="readerView"></div><div id="bs-reader-extras"><span id="bs-reader-progress">Your reading place will be remembered ♡</span><button id="bs-reader-highlights-toggle" type="button" onclick="bsReaderToggleHighlights()">✎ My highlights</button></div><div id="bs-reader-highlights" hidden><strong>Favorite passages ✨</strong><p class="sub">Select text inside an EPUB to save a highlighted passage.</p><div id="bs-reader-highlights-list"></div></div></div></div>
 <div class="foot">Made for quiet afternoons, endless chapters &amp; a little bit of magic ✦</div>
 </main>
 <div class="modalouter hidden" id="dialog" onclick="if(event.target===this)closeModal()" role="presentation"><div aria-labelledby="modalTitle" aria-modal="true" class="modal" role="dialog"><div class="modalhead"><h2 id="modalTitle">Add a book</h2><button aria-label="Close" class="x" onclick="closeModal()">×</button></div><div id="modalBody"></div></div></div><div class="toast hidden" id="toast" role="status"></div>
@@ -1242,6 +1242,66 @@ function bsRenderBingo(){
 }
 const bsOriginalRenderChallenges=renderChallenges;
 renderChallenges=function(){bsOriginalRenderChallenges();bsRenderBingo();};
+
+
+/* EPUB reading location and personal passage highlights. Original ebook files stay local. */
+function bsReaderNotes(){return readerMarks.__highlights&&typeof readerMarks.__highlights==='object'?readerMarks.__highlights:{}}
+function bsReaderToggleHighlights(){const el=$('bs-reader-highlights');el.hidden=!el.hidden;if(!el.hidden)bsReaderRenderHighlights()}
+function bsReaderRenderHighlights(){
+ const node=$('bs-reader-highlights-list');if(!node)return;
+ node.replaceChildren();
+ const items=Array.isArray(bsReaderNotes()[readerId])?bsReaderNotes()[readerId]:[];
+ for(const item of items){
+  const row=document.createElement('div');row.className='bs-highlight-item';
+  const txt=document.createElement('span');txt.className='bs-highlight-text';txt.textContent='“'+String(item.text||'').slice(0,220)+'”';
+  const goto=document.createElement('button');goto.type='button';goto.textContent='Go';goto.title='Open highlighted passage';goto.onclick=()=>readerRendition?.display(item.cfi);
+  const del=document.createElement('button');del.type='button';del.textContent='×';del.title='Delete highlighted passage';
+  del.onclick=()=>{
+   if(!confirm('Remove this highlight?'))return;
+   const all=bsReaderNotes(),next=(all[readerId]||[]).filter(x=>x.id!==item.id);
+   all[readerId]=next;readerMarks.__highlights=all;bsWrite(BS_READER_MARKS,readerMarks);
+   try{readerRendition?.annotations?.remove(item.cfi,'highlight')}catch{}
+   bsReaderRenderHighlights();
+  };
+  row.append(txt,goto,del);node.append(row);
+ }
+ if(!items.length){const p=document.createElement('p');p.className='sub';p.textContent='No highlights saved for this EPUB yet. Select some text to add one ♡';node.append(p)}
+}
+function bsReaderAddHighlight(cfi,contents){
+ if(!readerId||!cfi||!contents)return;
+ const text=String(contents.window?.getSelection?.()?.toString?.()||'').trim().slice(0,500);
+ if(!text)return;
+ const all=bsReaderNotes(),items=Array.isArray(all[readerId])?all[readerId]:[];
+ if(items.some(x=>x.cfi===cfi))return;
+ items.push({id:crypto.randomUUID?.()||'h'+Date.now(),cfi,text});
+ all[readerId]=items.slice(-100);readerMarks.__highlights=all;
+ bsWrite(BS_READER_MARKS,readerMarks);
+ try{readerRendition.annotations.highlight(cfi,{},null,'bs-passages')}catch(e){console.warn('Could not draw highlight',e)}
+ bsReaderRenderHighlights();
+ toast('Passage highlighted ♡');
+ try{contents.window.getSelection()?.removeAllRanges()}catch{}
+}
+function bsReaderUpdateProgress(loc){
+ const target=$('bs-reader-progress');if(!target)return;
+ const start=loc?.start;
+ const pct=Number(start?.percentage);
+ if(Number.isFinite(pct)&&pct>=0&&pct<=1){target.textContent='📖 '+Math.round(pct*100)+'% through this ebook · progress saved';return;}
+ const page=start?.displayed?.page,total=start?.displayed?.total;
+ target.textContent=page&&total?'📖 Page '+page+' of '+total+' in this chapter · place saved':'📖 Your last reading place is saved on this device';
+}
+const bsPreviousReaderOpen=openReader;
+openReader=async function(id){
+ $('bs-reader-highlights').hidden=true;
+ $('bs-reader-progress').textContent='Opening your book…';
+ await bsPreviousReaderOpen(id);
+ if(!readerRendition){$('bs-reader-progress').textContent='PDF reading is available on this device';return;}
+ bsReaderUpdateProgress(readerRendition.currentLocation?.());
+ readerRendition.on('relocated',bsReaderUpdateProgress);
+ readerRendition.on('selected',bsReaderAddHighlight);
+ const items=bsReaderNotes()[id]||[];
+ for(const item of items)try{readerRendition.annotations.highlight(item.cfi,{},null,'bs-passages')}catch{}
+ bsReaderRenderHighlights();
+};
 
 </script>
 </body>
