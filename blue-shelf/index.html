@@ -143,7 +143,7 @@ html.bs-authenticated #bs-auth-gate{display:none !important}
 .bs-auth-signout{border:1px solid #e4eaf1;background:#fff;color:#627d96;padding:8px 12px;border-radius:12px;cursor:pointer}
 @media(max-width:520px){.bs-auth-card{padding:27px 21px}.bs-auth-title{font-size:32px}}
 </style>
-</head>
+<style id="bs-hide-obsolete-cloud-tab">nav button[data-nav="cloud"], nav [onclick="go('cloud')"]{display:none!important}</style></head>
 <body>
 
 <div id="bs-auth-gate" role="region" aria-label="Blue Shelf sign in">
@@ -994,6 +994,16 @@ const bsCloudAuthObserver=setInterval(()=>{
   if(supa){clearInterval(wait);initGate();}
  },250);
  setTimeout(()=>{if(!ready&&!supa){clearInterval(wait);showForm('Unable to connect to Supabase. Check your internet and refresh the page.');}},12000);
+})();
+
+
+// Blue Shelf navigation cleanup: remove obsolete sync entry, retain all cloud logic.
+(function(){
+ function hideCloudMenu(){
+   document.querySelectorAll('nav button[data-nav="cloud"], nav button[onclick="go(\'cloud\')"]').forEach(button=>button.remove());
+ }
+ hideCloudMenu();
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',hideCloudMenu,{once:true});
 })();
 
 </script>
