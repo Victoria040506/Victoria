@@ -172,7 +172,7 @@ html.bs-authenticated #bs-auth-gate{display:none !important}
 .bs-reading-day{border:1px solid #e3ebf0;border-radius:10px;text-align:center;padding:10px 2px;font-size:11px;background:#f7f9fb;color:#8296a6}
 .bs-reading-day.active{background:#dce9d9;border-color:#c4ddc4;color:#4f7b61}.bs-reading-day.today{outline:2px solid #acc9e5}
 @media(max-width:530px){.bs-stats-month-bars{gap:4px}.bs-stats-day-grid{gap:4px}.bs-reading-day{padding:8px 0}}
-</style></head>
+</style><style id="bs-bingo-styles">.bs-bingo-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;margin:15px 0}.bs-bingo-square{min-height:99px;border-radius:18px;border:1px solid #dbe8ef;background:linear-gradient(155deg,#f9fcff,#fdf4f9);padding:14px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:7px;color:#617d95;font:600 13px 'DM Sans',sans-serif;cursor:pointer}.bs-bingo-square span{font-size:23px}.bs-bingo-square.done{background:linear-gradient(135deg,#dff1e7,#eaf2ff);border-color:#9bc9b2;color:#40755d;box-shadow:inset 0 0 0 2px #c6e7d5}.bs-bingo-square:focus-visible{outline:3px solid #83abc7}@media(max-width:460px){.bs-bingo-grid{gap:6px}.bs-bingo-square{font-size:11px;padding:10px 5px;min-height:85px}}</style></head>
 <body>
 
 <div id="bs-auth-gate" role="region" aria-label="Blue Shelf sign in">
@@ -258,7 +258,7 @@ html.bs-authenticated #bs-auth-gate{display:none !important}
 <section class="hidden" id="page-challenges"><div class="sectiontitle"><div><div class="eyebrow">A LITTLE MOTIVATION ✨</div><h2>Reading Challenges</h2><p class="sub">Gentle, flexible goals for your reading year — no pressure.</p></div></div>
  <div class="bs-block"><div class="bs-grid"><label class="bs-control">Yearly book goal<input id="challengeYearGoal" type="number" min="1" max="9999"></label><label class="bs-control">Monthly book goal<input id="challengeMonthGoal" type="number" min="1" max="500"></label><label class="bs-control">Monthly pages goal<input id="challengePageGoal" type="number" min="1" max="100000"></label><label class="bs-control">Genre to explore<input id="challengeGenre" maxlength="50" placeholder="e.g. Fantasy"></label></div>
  <div class="bs-actions"><button class="primary" onclick="saveChallenges()">💾 Save goals</button><span id="challengeSaveState" class="sub"></span></div></div>
- <div id="challengeCards" class="bs-grid"></div><div class="bs-block"><h3>Little achievements ✨</h3><div id="challengeBadges" class="bs-achievements"></div></div>
+ <div id="challengeCards" class="bs-grid"></div><div class="bs-block"><h3>Little achievements ✨</h3><div id="challengeBadges" class="bs-achievements"></div></div><div class="bs-block"><h3>🎀 Bookish bingo</h3><p class="sub">Mark off each cozy reading prompt as you complete it. Your squares sync across devices.</p><div id="bs-bingo-grid" class="bs-bingo-grid"></div><p id="bs-bingo-score" class="sub"></p></div>
 </section>
 
 <div id="readerDialog" class="reader-backdrop hidden" role="dialog" aria-label="Book reader" aria-modal="true"><div class="reader-shell"><div class="reader-top"><span id="readerTitle">Reader</span><div>
@@ -1205,6 +1205,43 @@ function bsRenderStatsPlus(){
 }
 const bsStatsOriginalRender=renderStats;
 renderStats=function(){bsStatsOriginalRender();bsRenderStatsPlus();};
+
+
+const bsBingoPrompts=[
+ ['🌸','Read a book with flowers on the cover'],
+ ['✨','Discover a new author'],
+ ['☕','Read on a cozy afternoon'],
+ ['📚','Finish a fantasy book'],
+ ['💗','Find a new favorite character'],
+ ['🌿','Read somewhere peaceful'],
+ ['🌙','Read before bedtime'],
+ ['🎀','Finish a book from your TBR'],
+ ['⭐','Give a book five stars']
+];
+function bsToggleBingo(index){
+ if(!Number.isInteger(index)||index<0||index>=bsBingoPrompts.length)return;
+ if(!challengeGoals.bingo||typeof challengeGoals.bingo!=='object')challengeGoals.bingo={};
+ challengeGoals.bingo[index]=!challengeGoals.bingo[index];
+ bsWrite(BS_CHALLENGES,challengeGoals);
+ bsRenderBingo();
+}
+function bsRenderBingo(){
+ const node=document.getElementById('bs-bingo-grid');if(!node)return;
+ const done=challengeGoals.bingo||{};
+ node.replaceChildren();
+ bsBingoPrompts.forEach(([emoji,prompt],index)=>{
+  const button=document.createElement('button');button.type='button';
+  button.className='bs-bingo-square'+(done[index]?' done':'');
+  button.setAttribute('aria-pressed',done[index]?'true':'false');
+  const icon=document.createElement('span');icon.textContent=done[index]?'✓':emoji;
+  const label=document.createElement('span');label.style.fontSize='inherit';label.textContent=prompt;
+  button.append(icon,label);button.onclick=()=>bsToggleBingo(index);node.append(button);
+ });
+ const count=Array.from({length:bsBingoPrompts.length},(_,i)=>!!done[i]).filter(Boolean).length;
+ document.getElementById('bs-bingo-score').textContent=count+' / 9 prompts completed'+(count===9?' · Bingo complete! ✨':'');
+}
+const bsOriginalRenderChallenges=renderChallenges;
+renderChallenges=function(){bsOriginalRenderChallenges();bsRenderBingo();};
 
 </script>
 </body>
