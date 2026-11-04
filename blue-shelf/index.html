@@ -289,6 +289,14 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
 .bs-reader-error button{padding:10px 17px;border:1px solid #d5e7ef;border-radius:12px;background:white;color:#587b95;cursor:pointer}
 #myLocalFiles .local-file{gap:14px}#myLocalFiles .local-file span{min-width:0;overflow-wrap:anywhere}
 #myLocalFiles .local-file button{flex:none;border-radius:11px;background:#e5f2fa;color:#4f7492;font-weight:700;padding:10px 14px}
+</style><style id="bs-separate-ebook-import-styles">
+.bs-import-reader-columns .panel{border-radius:24px;border:1px solid #e0eaf0;padding:26px;background:linear-gradient(140deg,#f1f9fd,#fffafd)}
+.bs-reader-upload-panel{background:linear-gradient(140deg,#fff7fb,#f5fbfd)!important}
+.bs-import-reader-columns .panel h3{font:600 25px 'Playfair Display',Georgia,serif;color:#4b708c;margin:8px 0}
+.bs-import-reader-columns .panel p{line-height:1.65}
+.bs-reader-upload-list{margin-top:25px;border-top:1px solid #e4ebf0;padding-top:14px}
+.bs-reader-upload-list h4{color:#557a96;font-size:14px;margin:5px 0 12px}
+.bs-import-reader-columns input[type=file]{width:100%;max-width:100%;font-size:12px;color:#66869c}
 </style></head>
 <body>
 
@@ -379,8 +387,24 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
 </section>
 </section>
 <section id="page-files" class="hidden">
- <div class="sectiontitle"><div><div class="eyebrow">YOUR DIGITAL BOOKS</div><h2>Import & Read 📖</h2><p class="sub">Import several EPUB and PDF files at once. Their reading copies stay on this device.</p></div></div>
- <div class="two section"><div class="panel journal-panel"><h3>📂 Add your books</h3><p class="sub">The full EPUB/PDF is saved first. Then Blue Shelf reads its title, author, cover and available publishing details. If metadata is missing, the book is still kept for reading. Original files stay on this device.</p><input type="file" id="ebookFiles" accept=".epub,.pdf,application/epub+zip,application/pdf" multiple><div style="margin-top:14px"><button id="bs-ebook-import-button" class="primary" onclick="importEbooks()">Save & import books ♡</button></div><p id="fileProgress" class="sub" aria-live="polite"></p></div><div class="panel journal-panel"><h3>📖 Your on-device reader</h3><p class="sub">Open any saved EPUB or PDF, turn pages, browse chapters and pick up where you stopped. Full ebook files stay on this device.</p><div id="myLocalFiles"></div></div></div>
+ <div class="sectiontitle"><div><div class="eyebrow">YOUR DIGITAL BOOKS</div><h2>Import & Read 📖</h2><p class="sub">Two separate spaces: catalogue book details or open a complete book in your reader.</p></div></div>
+ <div class="two section bs-import-reader-columns">
+  <div class="panel journal-panel bs-import-panel">
+   <span class="eyebrow">FOR YOUR LIBRARY</span><h3>🌸 Import book details</h3>
+   <p class="sub">Choose EPUB files to add their title, author, cover and other available details to your library. <strong>Full EPUB files are not saved by this import.</strong></p>
+   <input type="file" id="ebookFiles" accept=".epub,.pdf,application/epub+zip,application/pdf" multiple aria-label="Select books to add to your catalog">
+   <div style="margin-top:14px"><button id="bs-ebook-import-button" class="primary" onclick="importEbooks()">Add details to library ♡</button></div>
+   <p id="fileProgress" class="sub" aria-live="polite"></p>
+  </div>
+  <div class="panel journal-panel bs-reader-upload-panel">
+   <span class="eyebrow">JUST FOR READING</span><h3>📖 My ebook reader</h3>
+   <p class="sub">Upload an EPUB or PDF separately when you want to read it. The complete file stays in this browser for next time and does not add another book to your catalog.</p>
+   <input type="file" id="bs-reader-files" accept=".epub,.pdf,application/epub+zip,application/pdf" multiple aria-label="Select EPUB or PDF reading copies">
+   <div style="margin-top:14px"><button id="bs-reader-upload-button" class="primary" onclick="bsReaderImportFiles()">Add to reader 📖</button></div>
+   <p id="bs-reader-upload-status" class="sub" aria-live="polite"></p>
+   <div class="bs-reader-upload-list"><h4>My reading files</h4><div id="myLocalFiles"></div></div>
+  </div>
+ </div>
 </section>
 <section id="page-cloud" class="hidden">
  <div class="sectiontitle"><div><div class="eyebrow">READ EVERYWHERE</div><h2>Cloud Sync ☁️</h2><p class="sub">Automatic two-way synchronization after sign-in. Book records and journal update across devices; ebook files stay local.</p></div></div>
@@ -1199,59 +1223,73 @@ async function bsDetailReadingButton(id){
   actions.prepend(button);
  }catch(e){console.warn('Could not check local reading copy',e)}
 }
-/* File-first importer: an EPUB remains readable even when some OPF metadata is missing.
-   Ebook contents never enter the book records or the cloud. */
-let bsEbookImportBusy=false;
+/* Catalogue metadata import and reader file import are intentionally separate.
+   Catalogue: small details only. Reader: complete original files, only by explicit action. */
+let bsEbookImportBusy=false,bsReaderImportBusy=false;
+function bsBookFilenameTitle(name){return String(name||'').replace(/\.(epub|pdf)$/i,'').replace(/[_]+/g,' ').trim()}
+function bsBookTitleKey(s){return String(s||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
 async function importEbooks(){
  const picker=$('ebookFiles'),progress=$('fileProgress'),button=$('bs-ebook-import-button');
- const selected=[...(picker?.files||[])];
- if(!selected.length){progress.textContent='Choose EPUB or PDF files first.';return}
+ const files=[...(picker?.files||[])];if(!files.length){progress.textContent='Choose EPUB or PDF files first.';return}
  if(bsEbookImportBusy)return;
- bsEbookImportBusy=true;if(button)button.disabled=true;
- let saved=0,metadataOK=0,metadataMissing=0,errors=[],changed=false;
+ bsEbookImportBusy=true;button.disabled=true;
+ let added=0,updated=0,partial=0,errors=[],changed=false;
  try{
-  const existingFiles=await dbListFiles();
-  const byName=new Map(existingFiles.map(r=>[String(r.name||'').toLowerCase(),r]));
-  const normalize=v=>String(v||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
-  for(let i=0;i<selected.length;i++){
-   const file=selected[i],epub=/\.epub$/i.test(file.name),pdf=/\.pdf$/i.test(file.name);
-   if(!epub&&!pdf){errors.push(file.name+': unsupported file type');continue}
-   progress.textContent='Saving full reading copy '+(i+1)+' of '+selected.length+' — '+file.name;
-   try{
-    // Extracting metadata is optional. First preserve a complete original file in IndexedDB.
-    const known=byName.get(file.name.toLowerCase());
-    const id=known?.id||('ebook'+Date.now()+Math.random().toString(36).slice(2));
-    await dbPutFile({id,name:file.name,type:epub?'epub':'pdf',blob:file,added:known?.added||Date.now()});
-    byName.set(file.name.toLowerCase(),{id,name:file.name,added:known?.added||Date.now()});
-    saved++;
-    let meta={title:file.name.replace(/\.(epub|pdf)$/i,'').replace(/[_]+/g,' ').trim(),author:'',cover:''};
-    if(epub){
-     try{meta={...meta,...await getEpubInfo(file)};metadataOK++}
-     catch(err){metadataMissing++;console.warn('EPUB metadata not available; file remains readable:',file.name,err)}
-    }
-    let book=books.find(b=>b.id===id)||books.find(b=>normalize(b.title)===normalize(meta.title)&&(!meta.author||!b.author||normalize(b.author)===normalize(meta.author)));
-    if(!book){
-     book={id,added:Date.now(),title:meta.title||file.name,author:meta.author||'',cover:meta.cover||'',description:meta.description||'',publisher:meta.publisher||'',published:meta.published||'',isbn:meta.isbn||'',genre:'',status:'To Be Read',rating:0,pages:0,finished:'',notes:'',series:'',wishlist:false};
-     books.push(book);changed=true;
-    }else{
-     for(const field of ['cover','author','description','publisher','published','isbn'])if(!book[field]&&meta[field]){book[field]=meta[field];changed=true}
-    }
-    // Keep stable identifier for the reader even when a matched catalog book has another ID.
-    if(book.id!==id){
-     const rec=await dbGetFile(id);
-     await dbPutFile({...rec,id:book.id});
-     // The newly written original is intentionally kept until safely linked.
-     byName.set(file.name.toLowerCase(),{id:book.id,name:file.name,added:known?.added||Date.now()});
-    }
-    progress.textContent='✓ '+saved+' files preserved · extracting book information when available…';
-   }catch(err){errors.push(file.name+': '+(err.message||err))}
+  for(let i=0;i<files.length;i++){
+   const file=files[i],epub=/\.epub$/i.test(file.name),pdf=/\.pdf$/i.test(file.name);
+   if(!epub&&!pdf){errors.push(file.name+': unsupported type');continue}
+   progress.textContent='Reading book information '+(i+1)+' / '+files.length+' · '+file.name;
+   let meta={title:bsBookFilenameTitle(file.name),author:'',cover:''};
+   if(epub){
+    try{meta={...meta,...await getEpubInfo(file)}}
+    catch(e){partial++;console.warn('Could not read all EPUB metadata',file.name,e)}
+   }
+   // No dbPutFile here: reading contents are not retained by a catalog import.
+   const old=books.find(x=>bsBookTitleKey(x.title)===bsBookTitleKey(meta.title)&&(!meta.author||!x.author||bsBookTitleKey(x.author)===bsBookTitleKey(meta.author)));
+   if(old){
+    let enriched=false;
+    for(const field of ['author','cover','description','publisher','published','isbn'])if(!old[field]&&meta[field]){old[field]=meta[field];enriched=true}
+    if(enriched){updated++;changed=true}
+   }else{
+    books.push({id:'ebook'+Date.now()+Math.random().toString(36).slice(2),added:Date.now(),title:meta.title||file.name,author:meta.author||'',cover:meta.cover||'',description:meta.description||'',publisher:meta.publisher||'',published:meta.published||'',isbn:meta.isbn||'',genre:'',status:'To Be Read',rating:0,pages:0,finished:'',notes:'',series:'',wishlist:false});
+    added++;changed=true;
+   }
   }
   if(changed)store();
+  picker.value='';
+  progress.textContent='✓ '+added+' new books · '+updated+' updated'+(partial?' · '+partial+' with limited details':'')+(errors.length?' · '+errors.slice(0,2).join('; '):'')+'. Full EPUB/PDF reading files were not saved.';
+ }catch(e){progress.textContent='⚠ Import stopped: '+(e.message||e)}
+ finally{bsEbookImportBusy=false;button.disabled=false}
+}
+async function bsReaderImportFiles(){
+ const picker=$('bs-reader-files'),progress=$('bs-reader-upload-status'),button=$('bs-reader-upload-button');
+ const files=[...(picker?.files||[])];if(!files.length){progress.textContent='Choose an EPUB or PDF to read.';return}
+ if(bsReaderImportBusy)return;
+ bsReaderImportBusy=true;button.disabled=true;
+ let saved=0,errors=[],firstId=null;
+ try{
+  const already=await dbListFiles();
+  const fileNames=new Map(already.map(x=>[String(x.name||'').toLowerCase(),x]));
+  for(let i=0;i<files.length;i++){
+   const file=files[i],type=/\.epub$/i.test(file.name)?'epub':/\.pdf$/i.test(file.name)?'pdf':null;
+   if(!type){errors.push(file.name+': unsupported file type');continue}
+   progress.textContent='Saving reading copy '+(i+1)+' / '+files.length+' · '+file.name;
+   try{
+    const known=fileNames.get(file.name.toLowerCase());
+    const match=books.find(b=>bsBookTitleKey(b.title)===bsBookTitleKey(bsBookFilenameTitle(file.name)));
+    // Reuse a previous reader ID to preserve positions and highlights when replacing a file.
+    const id=known?.id||match?.id||('reader'+Date.now()+Math.random().toString(36).slice(2));
+    await dbPutFile({id,name:file.name,type,blob:file,added:known?.added||Date.now()});
+    fileNames.set(file.name.toLowerCase(),{id,name:file.name,added:known?.added||Date.now()});
+    if(!firstId)firstId=id;
+    saved++;
+   }catch(e){errors.push(file.name+': '+(e.message||e))}
+  }
   await renderLocalFiles();
-  if(saved===selected.length)picker.value='';
-  progress.textContent='✓ '+saved+' full reading '+(saved===1?'copy':'copies')+' saved on this device'+(metadataMissing?' · '+metadataMissing+' EPUB(s) kept without complete metadata':'')+(errors.length?' · Issues: '+errors.slice(0,3).join('; '):'')+'. Open any saved book with Read →.';
- }catch(err){progress.textContent='⚠ Import interrupted: '+(err.message||err)+'. Already saved files remain available.'}
- finally{bsEbookImportBusy=false;if(button)button.disabled=false}
+  if(saved===files.length)picker.value='';
+  progress.textContent='✓ '+saved+' '+(saved===1?'book':'books')+' added to your reader'+(errors.length?' · '+errors.slice(0,2).join('; '):'')+'. Your library catalog was not changed.';
+ }catch(e){progress.textContent='⚠ Reader import stopped: '+(e.message||e)}
+ finally{bsReaderImportBusy=false;button.disabled=false}
 }
 async function renderLocalFiles(){const node=document.getElementById('myLocalFiles');if(!node)return;node.replaceChildren();try{const files=await dbListFiles();files.sort((a,b)=>b.added-a.added);for(const f of files){let div=document.createElement('div');div.className='local-file';let title=document.createElement('span');title.textContent='📖 '+f.name.slice(0,55);let btn=document.createElement('button');btn.textContent='Read →';btn.onclick=()=>openReader(f.id);div.append(title,btn);node.append(div)}if(!files.length)node.textContent='No reading files imported on this device.'}catch(e){node.textContent='Local file storage unavailable in this browser: '+e.message}}
 let readerInstance=null,readerRendition=null,readerObjectUrl=null,readerId=null;
