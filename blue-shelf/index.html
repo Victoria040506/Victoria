@@ -297,6 +297,12 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
 .bs-reader-upload-list{margin-top:25px;border-top:1px solid #e4ebf0;padding-top:14px}
 .bs-reader-upload-list h4{color:#557a96;font-size:14px;margin:5px 0 12px}
 .bs-import-reader-columns input[type=file]{width:100%;max-width:100%;font-size:12px;color:#66869c}
+</style><style id="bs-reader-delete-css">
+#myLocalFiles .bs-reader-file-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+#myLocalFiles .bs-reader-file-row>span{flex:1;min-width:180px;font-size:13px;color:#56758e;overflow-wrap:anywhere}
+#myLocalFiles .bs-reader-file-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+#myLocalFiles .bs-reader-file-delete{background:#fff4f6;border:1px solid #edd9e0;color:#a36d84;font-weight:700}
+#myLocalFiles .bs-reader-file-delete:hover{background:#fde8ee}
 </style></head>
 <body>
 
@@ -1291,7 +1297,44 @@ async function bsReaderImportFiles(){
  }catch(e){progress.textContent='⚠ Reader import stopped: '+(e.message||e)}
  finally{bsReaderImportBusy=false;button.disabled=false}
 }
-async function renderLocalFiles(){const node=document.getElementById('myLocalFiles');if(!node)return;node.replaceChildren();try{const files=await dbListFiles();files.sort((a,b)=>b.added-a.added);for(const f of files){let div=document.createElement('div');div.className='local-file';let title=document.createElement('span');title.textContent='📖 '+f.name.slice(0,55);let btn=document.createElement('button');btn.textContent='Read →';btn.onclick=()=>openReader(f.id);div.append(title,btn);node.append(div)}if(!files.length)node.textContent='No reading files imported on this device.'}catch(e){node.textContent='Local file storage unavailable in this browser: '+e.message}}
+async function dbDeleteFile(id){
+ const db=await openFilesDB();
+ try{return await new Promise((resolve,reject)=>{
+  const tx=db.transaction('files','readwrite');
+  tx.objectStore('files').delete(id);
+  tx.oncomplete=()=>resolve(true);
+  tx.onerror=()=>reject(tx.error||new Error('Could not remove reading file'));
+  tx.onabort=()=>reject(tx.error||new Error('Deletion was cancelled'));
+ })}finally{db.close()}
+}
+async function bsDeleteReaderFile(id){
+ const file=await dbGetFile(id).catch(()=>null);
+ if(!file)return toast('Reading file not found.');
+ if(!confirm('Remove "'+file.name+'" from this device?\\n\\nThe book details in My Library will stay. This does not delete your original file on your computer.'))return;
+ try{
+  if(readerId===id&&!$('readerDialog').classList.contains('hidden'))closeReader();
+  await dbDeleteFile(id);
+  await renderLocalFiles();
+  toast('Reading copy removed. Library details are safe ♡');
+ }catch(err){alert('Could not remove this reading file: '+(err.message||err))}
+}
+async function renderLocalFiles(){
+ const node=$('myLocalFiles');if(!node)return;
+ node.replaceChildren();
+ try{
+  const files=await dbListFiles();
+  files.sort((a,b)=>b.added-a.added);
+  for(const f of files){
+   const row=document.createElement('div');row.className='local-file bs-reader-file-row';
+   const title=document.createElement('span');title.textContent='📖 '+f.name;title.title=f.name;
+   const actions=document.createElement('div');actions.className='bs-reader-file-actions';
+   const read=document.createElement('button');read.type='button';read.textContent='Read →';read.onclick=()=>openReader(f.id);
+   const remove=document.createElement('button');remove.type='button';remove.className='bs-reader-file-delete';remove.textContent='Delete';remove.setAttribute('aria-label','Remove '+f.name+' from reader');remove.onclick=()=>bsDeleteReaderFile(f.id);
+   actions.append(read,remove);row.append(title,actions);node.append(row);
+  }
+  if(!files.length)node.textContent='No reading files on this device yet. Upload a book above to start reading ♡';
+ }catch(e){node.textContent='Local file storage unavailable in this browser: '+e.message}
+}
 let readerInstance=null,readerRendition=null,readerObjectUrl=null,readerId=null;
 async function openReader(id){try{const rec=await dbGetFile(id);if(!rec)throw new Error('File not found on this device');readerId=id;document.getElementById('readerTitle').textContent=rec.name;const view=document.getElementById('readerView');view.replaceChildren();document.getElementById('readerDialog').classList.remove('hidden');if(rec.type==='pdf'){readerObjectUrl=URL.createObjectURL(rec.blob);const frame=document.createElement('iframe');frame.src=readerObjectUrl;frame.title=rec.name;view.append(frame)}else{await loadExternalScript(EPUB_URL,'ePub');const data=await rec.blob.arrayBuffer();readerInstance=window.ePub(data);const div=document.createElement('div');div.id='epubReadingArea';view.append(div);readerRendition=readerInstance.renderTo('epubReadingArea',{width:'100%',height:'100%',flow:'paginated'});let saved={};try{saved=JSON.parse(localStorage.getItem(READER_KEY)||'{}')}catch{};await readerRendition.display(saved[id]||undefined);readerRendition.on('relocated',loc=>{if(!loc?.start?.cfi)return;let v={};try{v=JSON.parse(localStorage.getItem(READER_KEY)||'{}')}catch{};v[id]=loc.start.cfi;localStorage.setItem(READER_KEY,JSON.stringify(v))})}}catch(e){alert('Could not open reader: '+e.message);closeReader()}}
 function readerPrev(){readerRendition?.prev()}
