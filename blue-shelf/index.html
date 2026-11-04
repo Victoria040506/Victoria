@@ -230,6 +230,26 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
 .bs-quick-rating{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.bs-quick-stars{display:flex;gap:2px}.bs-quick-star{border:0;background:transparent;font-size:28px;color:#cbd7df;cursor:pointer;padding:1px 3px;line-height:1}.bs-quick-star.selected{color:#d9b26b}.bs-quick-rating>span{font-weight:500;font-size:12px;color:#7c96a5}.bs-quick-clear{border:0;background:transparent;font-size:12px;color:#a47a91;text-decoration:underline;cursor:pointer}
 .bs-quick-actions{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;border-top:1px solid #e5ecf1;padding-top:16px;margin-top:18px}.bs-quick-actions span{font-size:12px;color:#66899b;flex:1}
 @media(max-width:570px){.bs-quick-book{padding:17px}.bs-quick-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.bs-quick-heading h3{font-size:23px}}
+</style><style id="bs-journal-polish">
+#page-journal .bs-journal-hero{border:1px solid #dcebf2;background:radial-gradient(circle at 90% 4%,#f7e5ec,transparent 36%),linear-gradient(115deg,#e5f3fc,#fbfdfd);border-radius:28px;padding:32px 37px;display:flex;align-items:center;justify-content:space-between;gap:15px;margin:0 0 23px}
+#page-journal .bs-journal-hero h1{font:600 clamp(28px,3.4vw,41px) 'Playfair Display',Georgia,serif;color:#466c88;margin:9px 0}#page-journal .bs-journal-hero h1 span{color:#c99fb8}
+#page-journal .bs-journal-hero p{font-size:14px;color:#7e98a7;max-width:610px;line-height:1.6;margin:0}#page-journal .bs-journal-hero-decoration{font-size:36px;opacity:.6;white-space:nowrap}
+#page-journal .journal-columns{align-items:start;gap:21px}#page-journal .journal-panel{border-radius:23px;padding:27px;background:#fff;border:1px solid #e6edf1}
+#page-journal .bs-journal-label h3{font:600 26px 'Playfair Display',Georgia,serif;color:#4c708d;margin:8px 0 19px}#page-journal .journal-panel>label{color:#577a93;font-weight:650}
+#page-journal .journal-panel :is(input,textarea,select){border-radius:12px;border:1px solid #dfeaf0;background:#fcfdfe}
+#page-journal .bs-journal-book-preview{display:flex;gap:14px;padding:15px;border:1px solid #e5eff4;border-radius:16px;background:linear-gradient(120deg,#f1f8fc,#fff7fa);margin:16px 0 21px;align-items:center}
+#page-journal .bs-journal-book-cover{width:85px;flex:0 0 85px}#page-journal .bs-journal-book-cover .cover{height:125px;border-radius:9px}#page-journal .bs-journal-book-cover .fallback{font-size:10px}
+#page-journal .bs-journal-book-info{flex:1;min-width:0;display:grid;gap:5px}#page-journal .bs-journal-book-info strong{font-size:13px;line-height:1.5;color:#476780}#page-journal .bs-journal-book-info span{font-size:12px;color:#8096a6}#page-journal .bs-journal-chip{background:#e7f0f7;border-radius:12px;padding:5px 8px;width:max-content;font-weight:700}
+#page-journal .bs-journal-mini-progress{height:7px;background:#e3edf2;border-radius:99px;overflow:hidden}#page-journal .bs-journal-mini-progress div{height:100%;background:linear-gradient(90deg,#a7cee1,#d9bdd0)}
+#page-journal .bs-journal-book-info small{font-size:11px;color:#8298a9}#page-journal .bs-journal-book-link{border:0;background:transparent;color:#537d9b;text-align:left;cursor:pointer;font-size:12px;font-weight:700;padding:5px 0}
+#page-journal .bs-journal-save-button{width:100%;margin-top:11px}#page-journal .bs-journal-entry-card{border:1px solid #e3ebf0;border-radius:16px;background:#fbfdfe;padding:14px;margin:0 0 13px}
+#page-journal .bs-journal-entry-heading{display:flex;gap:12px;align-items:center}#page-journal .bs-journal-entry-heading>.cover{width:47px;flex:0 0 47px;height:69px;border-radius:7px}#page-journal .bs-journal-entry-heading .fallback{font-size:8px}
+#page-journal .bs-journal-entry-heading strong{font-size:13px;display:block;color:#456984}#page-journal .bs-journal-entry-heading small{font-size:11px;color:#8ba0ad;display:block;margin:4px 0}
+#page-journal .bs-journal-entry-tags{display:flex;flex-wrap:wrap;gap:5px}#page-journal .bs-journal-entry-tags span{font-size:10px;background:#eef3f8;border-radius:12px;padding:3px 8px;color:#66859c}
+#page-journal .bs-journal-entry-card>p{font-size:12px;line-height:1.65;color:#688399;margin:10px 0}#page-journal .bs-journal-entry-card blockquote{font:italic 13px 'Playfair Display',Georgia,serif;color:#986f8c;border-left:2px solid #e0bbcf;margin:12px 0;padding-left:11px}
+#page-journal .bs-journal-entry-footer{display:flex;justify-content:space-between;gap:8px;align-items:center;border-top:1px solid #edf1f4;margin-top:10px;padding-top:9px;font-size:10px;color:#899ca9}#page-journal .bs-journal-entry-footer button{border:0;background:transparent;color:#557c9a;font-weight:700;cursor:pointer}
+#page-journal .bs-journal-empty{text-align:center;padding:35px 12px;color:#afc2ce;font-size:28px}#page-journal .bs-journal-empty p{font-size:14px;color:#6f8ba0}#page-journal .bs-journal-empty small{display:block;font-size:12px}
+@media(max-width:600px){#page-journal .bs-journal-hero{padding:23px}#page-journal .bs-journal-hero-decoration{display:none}#page-journal .journal-panel{padding:18px}}
 </style></head>
 <body>
 
@@ -298,13 +318,13 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
 <div class="bs-shelf-style-controls"><label>Arrange books <select id="bsShelfSort" onchange="renderBookshelf()"><option value="title">Title A–Z</option><option value="recent">Recently added</option><option value="pages">Page count</option><option value="custom">My custom order</option></select></label><label>Spine colors <select id="bsShelfPalette" onchange="bsShelfSetPalette(this.value)"><option value="pastel">Pastel mix</option><option value="blue">Baby blue</option><option value="pink">Soft pink</option><option value="sage">Sage garden</option></select></label></div><div class="controls"><input id="shelfSearch" placeholder="⌕  Find a book on the shelf..." oninput="renderBookshelf()"><select id="shelfFilter" onchange="renderBookshelf()"><option value="">All books</option><option>Read</option><option>Currently Reading</option><option>To Be Read</option><option>DNF</option></select></div><div id="virtualShelves"></div>
 </section>
 <section id="page-journal" class="hidden">
- <div class="sectiontitle"><div><div class="eyebrow">LITTLE MOMENTS, BIG STORIES</div><h2>Reading Journal ✎</h2><p class="sub">Track your progress, collect favorite lines and remember every story.</p></div></div>
+ <div class="bs-journal-hero"><div><div class="eyebrow">✿ THE STORIES BEHIND THE STORIES</div><h1>My Reading Journal <span>♡</span></h1><p>A little space for the chapters you remember, the characters you love and the thoughts you want to keep.</p></div><span class="bs-journal-hero-decoration" aria-hidden="true">✎ 🌸</span></div>
  <div class="journal-stats" id="journalStats"></div>
- <div class="journal-columns"><div class="panel journal-panel"><label for="journalBook">Choose a book</label><select id="journalBook" onchange="loadJournal()"></select>
+ <div class="journal-columns"><div class="panel journal-panel"><div class="bs-journal-label"><span class="eyebrow">YOUR STORY RIGHT NOW</span><h3>Write a journal entry ✎</h3></div><label for="journalBook">Choose a book</label><select id="journalBook" onchange="loadJournal()"></select><div id="bs-journal-book-preview" class="bs-journal-book-preview"></div>
  <div class="journal-dates"><label>Started <input type="date" id="journalStart"></label><label>Finished <input type="date" id="journalEnd"></label></div>
  <label>Page progress <input type="number" min="0" id="journalProgress" placeholder="Page reached"></label><label>Reading mood <select id="journalMood"><option value="">Choose a mood</option><option>☁️ Cozy</option><option>💗 Loved it</option><option>🌿 Calm</option><option>✨ Exciting</option><option>🥺 Emotional</option></select></label>
- <label>My thoughts <textarea rows="5" id="journalThoughts" placeholder="How did this story make you feel?"></textarea></label><label>Favorite quotation <textarea rows="3" id="journalQuote" placeholder="One line to remember..."></textarea></label><div class="bs-journal-extras"><label>My rating <select id="journalRating"><option value="">Not rated yet</option><option value="1">★☆☆☆☆ · 1 star</option><option value="2">★★☆☆☆ · 2 stars</option><option value="3">★★★☆☆ · 3 stars</option><option value="4">★★★★☆ · 4 stars</option><option value="5">★★★★★ · 5 stars</option></select></label><label>Favorite characters <input id="journalCharacters" maxlength="180" placeholder="Who stayed with you?"></label></div><label>A little memory of this book <textarea id="journalMemory" rows="3" maxlength="2000" placeholder="A scene, a feeling, a moment you want to remember..."></textarea></label><button class="primary" onclick="saveJournal()">💾 Save journal entry</button><p id="journalSaved" class="sub"></p></div>
- <div class="panel journal-panel"><h3>My Reading Notes 🌸</h3><p class="sub">Entries are stored in your browser and included in backups. Cloud sync is available after connecting your own account.</p><div id="journalEntries"></div></div></div>
+ <label>My thoughts <textarea rows="5" id="journalThoughts" placeholder="How did this story make you feel?"></textarea></label><label>Favorite quotation <textarea rows="3" id="journalQuote" placeholder="One line to remember..."></textarea></label><div class="bs-journal-extras"><label>My rating <select id="journalRating"><option value="">Not rated yet</option><option value="1">★☆☆☆☆ · 1 star</option><option value="2">★★☆☆☆ · 2 stars</option><option value="3">★★★☆☆ · 3 stars</option><option value="4">★★★★☆ · 4 stars</option><option value="5">★★★★★ · 5 stars</option></select></label><label>Favorite characters <input id="journalCharacters" maxlength="180" placeholder="Who stayed with you?"></label></div><label>A little memory of this book <textarea id="journalMemory" rows="3" maxlength="2000" placeholder="A scene, a feeling, a moment you want to remember..."></textarea></label><button type="button" class="primary bs-journal-save-button" onclick="saveJournal()">♡ Save journal entry</button><p id="journalSaved" class="sub"></p></div>
+ <div class="panel journal-panel"><div class="bs-journal-label"><span class="eyebrow">MEMORIES WORTH KEEPING</span><h3>My Reading Notes 🌸</h3><p class="sub">All your saved thoughts, favorite characters and quotes in one place.</p></div><div id="journalEntries"></div></div></div>
 
 <section class="bs-block" id="journalV2">
  <h3>🌸 Daily reading sessions</h3><p class="sub">Log your reading time and pages for any book. Your calendar and streak update automatically.</p>
@@ -1051,10 +1071,56 @@ function renderJournal(){
  if(books.some(b=>b.id===current))sel.value=current;loadJournal();renderJournalEntries();
  const stats=document.getElementById('journalStats'),entries=Object.values(journal);const completed=entries.filter(e=>e.end).length;stats.innerHTML=`<span class="journal-chip">✎ ${entries.length} journal entries</span><span class="journal-chip">🌸 ${completed} finished with dates</span><span class="journal-chip">📚 ${books.length} books catalogued</span>`;
 }
-function loadJournal(){const id=document.getElementById('journalBook').value,e=journal[id]||{};for(const [key,input] of [['start','journalStart'],['end','journalEnd'],['progress','journalProgress'],['mood','journalMood'],['thoughts','journalThoughts'],['quote','journalQuote'],['rating','journalRating'],['characters','journalCharacters'],['memory','journalMemory']]){document.getElementById(input).value=e[key]||''}document.getElementById('journalSaved').textContent=''}
-function saveJournal(){const id=document.getElementById('journalBook').value;if(!id)return;const e={start:document.getElementById('journalStart').value,end:document.getElementById('journalEnd').value,progress:Math.max(0,Number(document.getElementById('journalProgress').value)||0),mood:document.getElementById('journalMood').value,thoughts:document.getElementById('journalThoughts').value,quote:document.getElementById('journalQuote').value,rating:document.getElementById('journalRating').value,characters:document.getElementById('journalCharacters').value.trim().slice(0,180),memory:document.getElementById('journalMemory').value.trim().slice(0,2000)};journal[id]=e;persistJournal();renderJournalEntries();document.getElementById('journalSaved').textContent='✓ Saved locally';}
-function renderJournalEntries(){const node=document.getElementById('journalEntries');if(!node)return;node.replaceChildren();for(const [id,e] of Object.entries(journal).reverse()){const b=books.find(b=>b.id===id);if(!b)continue;let el=document.createElement('div');el.className='journal-entry';el.innerHTML=`<b>${safeText(b.title)}</b><small>${safeText([e.start,e.end].filter(Boolean).join(' → '))} ${e.progress?(' · page '+e.progress):''}</small><p>${safeText((e.thoughts||'').slice(0,300))}</p>${e.rating?'<small>⭐ '+safeText(e.rating)+'/5</small>':''}${e.characters?'<p><b>Favorite characters:</b> '+safeText(e.characters)+'</p>':''}${e.memory?'<p><b>Remember:</b> '+safeText(e.memory.slice(0,300))+'</p>':''}`;node.append(el)}if(!node.childNodes.length)node.textContent='Your thoughts will appear here ♡'}
-
+function loadJournal(){
+ const id=$('journalBook').value,b=books.find(x=>x.id===id),e=journal[id]||{};
+ const values={start:e.start||b?.started||'',end:e.end||b?.finished||'',progress:e.progress??b?.currentPage??'',mood:e.mood||'',thoughts:e.thoughts||'',quote:e.quote||'',rating:e.rating??(b?.rating||''),characters:e.characters||'',memory:e.memory||''};
+ for(const [key,input] of [['start','journalStart'],['end','journalEnd'],['progress','journalProgress'],['mood','journalMood'],['thoughts','journalThoughts'],['quote','journalQuote'],['rating','journalRating'],['characters','journalCharacters'],['memory','journalMemory']])$(input).value=values[key];
+ const preview=$('bs-journal-book-preview');
+ if(b){
+  const pct=b.pages?Math.round(Math.min(100,100*(Number(b.currentPage)||0)/Number(b.pages))):Number(b.progressPercent)||0;
+  preview.innerHTML=`<div class="bs-journal-book-cover">${cover(b)}</div><div class="bs-journal-book-info"><strong>${esc(b.title)}</strong><span>${esc(b.author||'Unknown author')}</span><span class="bs-journal-chip">${esc(b.status||'To Be Read')}</span><div class="bs-journal-mini-progress"><div style="width:${Math.min(100,Math.max(0,pct))}%"></div></div><small>${Math.min(100,Math.max(0,pct))}% read${b.pages?' · '+esc(b.currentPage||0)+' / '+esc(b.pages)+' pages':''}</small><button type="button" class="bs-journal-book-link" onclick="detail('${esc(b.id)}')">Open book details ↗</button></div>`;
+ }else preview.innerHTML='<p class="sub">Select a book to start your entry.</p>';
+ $('journalSaved').textContent='';
+}
+function saveJournal(){
+ const id=$('journalBook').value,b=books.find(x=>x.id===id);if(!b)return;
+ const progress=Math.max(0,Math.round(Number($('journalProgress').value)||0));
+ if(b.pages&&progress>b.pages){$('journalSaved').textContent='Page progress cannot exceed the total pages.';return}
+ const start=$('journalStart').value,end=$('journalEnd').value;
+ if(start&&end&&end<start){$('journalSaved').textContent='The finish date cannot be earlier than the start date.';return}
+ const e={...(journal[id]||{}),start,end,progress,mood:$('journalMood').value,thoughts:$('journalThoughts').value,quote:$('journalQuote').value,rating:$('journalRating').value,characters:$('journalCharacters').value.trim().slice(0,180),memory:$('journalMemory').value.trim().slice(0,2000)};
+ journal[id]=e;persistJournal();
+ // Sync only explicitly supplied reading details; never overwrite unrelated metadata or notes.
+ const changes={};
+ if($('journalProgress').value!==''){changes.currentPage=progress;if(b.pages)changes.progressPercent=Math.min(100,Math.round(progress*100/b.pages))}
+ if(start)changes.started=start;
+ if(end)changes.finished=end;
+ if(e.rating!=='')changes.rating=Number(e.rating);
+ if(Object.keys(changes).length){
+  books=books.map(x=>x.id===id?{...x,...changes}:x);store();
+ }
+ renderJournalEntries();bsJournalPreviewRefresh();
+ $('journalSaved').textContent='✓ Journal entry saved. Reading progress and rating are updated in Book details.';
+}
+function bsJournalPreviewRefresh(){
+ const id=$('journalBook')?.value,b=books.find(x=>x.id===id),preview=$('bs-journal-book-preview');if(!b||!preview)return;
+ const pct=b.pages?Math.round(Math.min(100,100*(Number(b.currentPage)||0)/Number(b.pages))):Number(b.progressPercent)||0;
+ const bar=preview.querySelector('.bs-journal-mini-progress div');if(bar)bar.style.width=Math.min(100,Math.max(0,pct))+'%';
+ const small=preview.querySelector('small');if(small)small.textContent=Math.min(100,Math.max(0,pct))+'% read'+(b.pages?' · '+(b.currentPage||0)+' / '+b.pages+' pages':'');
+}
+function renderJournalEntries(){
+ const node=$('journalEntries');if(!node)return;node.replaceChildren();
+ const active=Object.entries(journal).filter(([id,e])=>books.some(b=>b.id===id)&&e&&typeof e==='object').reverse();
+ for(const [id,e] of active){
+  const b=books.find(x=>x.id===id),el=document.createElement('article');
+  el.className='bs-journal-entry-card';
+  const text=String(e.thoughts||e.memory||'').trim();
+  el.innerHTML=`<div class="bs-journal-entry-heading">${cover(b)}<div><strong>${esc(b.title)}</strong><small>${esc(b.author||'Unknown author')}</small><div class="bs-journal-entry-tags">${e.rating?`<span>★ ${esc(e.rating)}/5</span>`:''}${e.mood?`<span>${esc(e.mood)}</span>`:''}</div></div></div>${text?`<p>${esc(text.slice(0,240))}</p>`:''}${e.quote?`<blockquote>“${esc(String(e.quote).slice(0,160))}”</blockquote>`:''}<div class="bs-journal-entry-footer"><span>${esc([e.start,e.end].filter(Boolean).join(' → '))}${e.progress?' · page '+esc(e.progress):''}</span><button type="button" onclick="bsJournalSelect('${esc(id)}')">Open entry ↗</button></div>`;
+  node.append(el);
+ }
+ if(!active.length)node.innerHTML='<div class="bs-journal-empty">✿<p>Your journal is waiting for its first story.</p><small>Choose a book and save a memory to begin ♡</small></div>';
+}
+function bsJournalSelect(id){const select=$('journalBook');select.value=id;loadJournal();$('page-journal').scrollIntoView({behavior:'smooth'});}
 // IndexedDB holds the user's original files on this device, separate from synchronized catalog data.
 function openFilesDB(){return new Promise((resolve,reject)=>{const req=indexedDB.open('blue-shelf-reader-files',1);req.onupgradeneeded=()=>req.result.createObjectStore('files',{keyPath:'id'});req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
 async function dbListFiles(){const db=await openFilesDB();return new Promise((resolve,reject)=>{const tx=db.transaction('files','readonly');const req=tx.objectStore('files').getAll();req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
