@@ -1743,91 +1743,111 @@ async function bsAutoReadCloud(){
  if(error)throw error;
  return data;
 }
+/* v4: per-book sync, incremental batches, no bulk JSONB book uploads. */
+const BS_BOOK_SYNC_VERSION='blue-shelf-book-hashes-v4:';
+function bsBookHash(b){
+ const str=JSON.stringify(b);let h=2166136261;
+ for(let i=0;i<str.length;i++)h=Math.imul(h^str.charCodeAt(i),16777619);
+ return (h>>>0).toString(36)+':'+str.length;
+}
+function bsBookSyncMap(){
+ try{return JSON.parse(localStorage.getItem(BS_BOOK_SYNC_VERSION+cloudUser.id)||'{}')}catch{return {}}
+}
+function bsBookSyncSave(hashes){
+ try{localStorage.setItem(BS_BOOK_SYNC_VERSION+cloudUser.id,JSON.stringify(hashes))}catch(e){console.warn('Cannot persist sync index',e)}
+}
+async function bsBookCloudAll(){
+ const out=[];let start=0;
+ while(true){
+  const {data,error}=await supa.from('blue_shelf_books').select('book_id,data').eq('user_id',cloudUser.id).order('book_id').range(start,start+49);
+  if(error)throw error;
+  out.push(...(data||[]));if(!data||data.length<50)break;
+  start+=50;
+ }
+ return out;
+}
+async function bsBookCloudCount(){
+ const {count,error}=await supa.from('blue_shelf_books').select('book_id',{count:'exact',head:true}).eq('user_id',cloudUser.id);
+ if(error)throw error;return count||0;
+}
 async function bsAutoRun(forcePush=false){
  if(bsAutoBusy||!supa||!cloudUser)return false;
  bsAutoBusy=true;
- const startedRevision=bsAutoChanges;
+ const revision=bsAutoChanges;
  try{
   await bsDurableInitialization;
-  // Local IndexedDB is authoritative when larger than localStorage or the in-memory catalog.
   const durable=await bsDurableRead();
-  if(Array.isArray(durable?.books)&&durable.books.length>books.length){
-   books=durable.books;
-   go(document.querySelector('[data-nav].active')?.dataset.nav||'library');
-  }
-  const remote=await bsAutoReadCloud();
-  const remoteBooks=Array.isArray(remote?.books)?remote.books.filter(b=>b&&typeof b.id==='string'&&b.title):[];
+  if(Array.isArray(durable?.books)&&durable.books.length>books.length)books=durable.books;
   const localBooks=books.filter(b=>b&&typeof b.id==='string'&&b.title);
-  const dirty=bsAutoPending||bsAutoChanges>bsAutoSynced;
-  const merged=bsAutoMergeBooks(localBooks,remoteBooks,dirty);
-  if(merged.length<Math.max(localBooks.length,remoteBooks.length))throw new Error('Sync safety check rejected a smaller catalog.');
-  // Save the merged catalog on disk BEFORE allowing any update to account data.
-  if(JSON.stringify(merged)!==JSON.stringify(localBooks)){
-   await bsDurableWrite(merged);
-   const saved=await bsDurableRead();
-   if(saved?.books?.length!==merged.length)throw new Error('IndexedDB verification failed; no cloud changes sent.');
-   books=merged;
-   try{localStorage.setItem(KEY,JSON.stringify(books))}catch{}
-   go(document.querySelector('[data-nav].active')?.dataset.nav||'library');
+  const prior=bsBookSyncMap();
+  const legacy=await bsAutoReadCloud();
+  const legacyBooks=Array.isArray(legacy?.books)?legacy.books.filter(b=>b&&typeof b.id==='string'&&b.title):[];
+  const cloudRows=await bsBookCloudAll();
+  const remoteById=new Map(cloudRows.filter(x=>x&&x.data&&x.book_id).map(x=>[x.book_id,x.data]));
+  // Seed records from the original cloud format without ever clearing that format.
+  for(const b of legacyBooks)if(!remoteById.has(b.id))remoteById.set(b.id,b);
+  const localById=new Map(localBooks.map(b=>[b.id,b]));
+  const mergedMap=new Map(remoteById);
+  const upload=new Map();
+  for(const b of localBooks){
+   const remote=remoteById.get(b.id);
+   const changedSinceLastSync=prior[b.id]&&prior[b.id]!==bsBookHash(b);
+   if(!remote||changedSinceLastSync){
+    mergedMap.set(b.id,b);
+    upload.set(b.id,b);
+   }else if(!prior[b.id]&&localBooks.length>remoteById.size){
+    // When importing a larger recovered library, retain its full metadata.
+    mergedMap.set(b.id,bsHandoffMerge([b],[remote])[0]);
+    upload.set(b.id,mergedMap.get(b.id));
+   }
   }
-  // Never upload on a download-only check when the remote already covers all local IDs
-  // and no local editing has occurred. Same-size catalogs on other devices are safe.
-  const remoteIdSet=new Set(remoteBooks.map(b=>b.id));
-  const localNew=localBooks.some(b=>!remoteIdSet.has(b.id));
-  const needsUpload=!remote||merged.length>remoteBooks.length||localNew||((dirty||forcePush)&&JSON.stringify(merged)!==JSON.stringify(remoteBooks));
-  if(needsUpload){
-   // A large catalog always needs a verified local save before uploading.
-   await bsDurableWrite(merged);
-   const verified=await bsDurableRead();
-   if(verified?.books?.length!==merged.length)throw new Error('Local safety copy could not be verified.');
-   // Do not send a stale snapshot if books were edited while the sync was reading.
-   if(startedRevision!==bsAutoChanges){
-    bsAutoPending=true;
-    bsAutoCloudState('New edits detected; saving the latest version shortly…');
-    return false;
-   }
-   const latest=await bsAutoReadCloud();
-   const newest=Array.isArray(latest?.books)?latest.books:[];
-   if(latest?.updated_at!==remote?.updated_at){
-    bsAutoPending=true;
-    bsAutoCloudState('Another browser updated your library. Merging the newer copy shortly…');
-    return false;
-   }
-   if(newest.length>merged.length)throw new Error('A larger cloud library was detected. Nothing was overwritten.');
-   const previousJournal=latest?.journal&&typeof latest.journal==='object'?latest.journal:{};
-   const mergedJournal=dirty?bsHandoffJournal(bsAutoSnapshot(),previousJournal):bsHandoffJournal(previousJournal,bsAutoSnapshot());
-   const payload={
-    user_id:cloudUser.id,books:merged,journal:mergedJournal,
-    goal:Math.max(getGoal(),Number(latest?.goal)||0),updated_at:new Date().toISOString()
-   };
-   const {error}=await supa.from('blue_shelf_user_data').upsert(payload,{onConflict:'user_id'});
+  // Legacy-only records must be copied too, so other browsers can see them.
+  for(const [id,b] of remoteById)if(!cloudRows.some(r=>r.book_id===id))upload.set(id,mergedMap.get(id));
+  const merged=[...mergedMap.values()];
+  if(merged.length<Math.max(localBooks.length,remoteById.size))throw Error('Refusing to shrink a library.');
+  await bsDurableWrite(merged);
+  const verified=await bsDurableRead();
+  if(!Array.isArray(verified?.books)||verified.books.length!==merged.length)throw Error('Local IndexedDB save verification failed.');
+  books=merged;
+  go(document.querySelector('[data-nav].active')?.dataset.nav||'library');
+  if(revision!==bsAutoChanges){bsAutoPending=true;bsAutoCloudState('New changes detected; syncing again after local save…');return false;}
+  const pending=[...upload.values()].filter(b=>b&&typeof b.id==='string');
+  // Each HTTP request remains small; earlier successful batches are retained on failure.
+  const batches=[];let batch=[],bytes=0;
+  for(const b of pending){
+   const size=JSON.stringify(b).length;
+   if(batch.length&&(batch.length>=12||bytes+size>180000)){batches.push(batch);batch=[];bytes=0;}
+   batch.push(b);bytes+=size;
+  }
+  if(batch.length)batches.push(batch);
+  bsAutoCloudState('Synchronizing '+pending.length+' books in '+batches.length+' small batches…');
+  const syncedMap={...prior};
+  for(let i=0;i<batches.length;i++){
+   if(revision!==bsAutoChanges){bsAutoPending=true;return false;}
+   const payload=batches[i].map(b=>({user_id:cloudUser.id,book_id:b.id,data:b,updated_at:new Date().toISOString()}));
+   const {error}=await supa.from('blue_shelf_books').upsert(payload,{onConflict:'user_id,book_id'});
    if(error)throw error;
-   // Count is only marked as synced after reading it back from Supabase.
-   const confirmed=await bsAutoReadCloud();
-   if(!Array.isArray(confirmed?.books)||confirmed.books.length!==merged.length)throw new Error('Cloud save was not verified. Your local books remain safe.');
-   bsAutoSynced=startedRevision;
-   if(startedRevision===bsAutoChanges)bsAutoPending=false;
-   bsCloudMarkSynced(cloudUser.id,confirmed.updated_at);
-   cloudEnabled=true;
-   bsAutoCloudState('✓ '+merged.length+' books verified on your account · '+new Date().toLocaleTimeString());
-  }else{
-   bsAutoSynced=startedRevision;
-   if(startedRevision===bsAutoChanges)bsAutoPending=false;
-   if(remote?.updated_at)bsCloudMarkSynced(cloudUser.id,remote.updated_at);
-   bsAutoCloudState('✓ '+merged.length+' books available here and on your account · '+new Date().toLocaleTimeString());
+   for(const b of batches[i])syncedMap[b.id]=bsBookHash(b);
+   bsBookSyncSave(syncedMap);
+   bsAutoCloudState('Saving books to your account: '+(i+1)+' / '+batches.length+' batches…');
   }
+  const cloudCount=await bsBookCloudCount();
+  if(cloudCount<merged.length)throw Error('Cloud verification incomplete: '+cloudCount+' of '+merged.length+' book records.');
+  // Remember known cloud values so local edits can be detected next time.
+  for(const b of merged)syncedMap[b.id]=bsBookHash(b);
+  bsBookSyncSave(syncedMap);
+  bsAutoSynced=revision;
+  if(revision===bsAutoChanges)bsAutoPending=false;
   bsAutoLastCheck=Date.now();
+  bsAutoCloudState('✓ '+cloudCount+' books saved on your account · '+new Date().toLocaleTimeString());
   return true;
  }catch(e){
-  console.error('Blue Shelf automatic account sync',e);
-  bsAutoCloudState('⚠️ Cloud synchronization not confirmed: '+(e.message||e)+'. Local library is preserved; download a backup.',true);
+  bsAutoCloudState('⚠️ Cloud synchronization not confirmed: '+(e.message||e)+'. Local books remain safe; keep your backup.',true);
+  console.error('Blue Shelf incremental sync',e);
   return false;
  }finally{
   bsAutoBusy=false;
-  if(bsAutoPending){
-   clearTimeout(bsAutoTimer);
-   bsAutoTimer=setTimeout(()=>bsAutoRun(),10000);
-  }
+  if(bsAutoPending){clearTimeout(bsAutoTimer);bsAutoTimer=setTimeout(()=>bsAutoRun(),10000);}
  }
 }
 function bsAutoQueue(delay=3500){
@@ -1851,7 +1871,7 @@ bsCloudRead=async function(){return bsAutoRun()};
 bsCloudPush=async function(){return bsAutoRun(true)};
 bsCloudCheck=async function(){
  if(document.visibilityState==='hidden'||!supa||!cloudUser||bsAutoBusy)return;
- if(Date.now()-bsAutoLastCheck<25000)return;
+ if(Date.now()-bsAutoLastCheck<600000)return;
  await bsAutoRun();
 };
 cloudUpload=async function(){return bsAutoRun(true)};
@@ -1884,21 +1904,14 @@ function bsSyncUpdateLocal(){
 async function bsInspectSync(){
  bsSyncUpdateLocal();
  const node=$('bs-sync-cloud-count');
- if(!supa||!cloudUser){if(node)node.textContent='Account: not signed in';bsSyncSetDetail('No signed-in Supabase session detected in this browser.');return}
- if(node)node.textContent='Account: checking…';
+ if(!supa||!cloudUser){if(node)node.textContent='Account: not signed in';return}
  try{
-  const {data,error}=await supa.from('blue_shelf_user_data').select('books,updated_at').eq('user_id',cloudUser.id).maybeSingle();
-  if(error)throw error;
-  const remote=Array.isArray(data?.books)?data.books:null;
-  if(node)node.textContent='Account: '+(remote?remote.length+' books':'no catalog found');
-  const saved=data?.updated_at?new Date(data.updated_at).toLocaleString():'not recorded';
-  const mismatch=remote&&remote.length!==books.length;
-  const note=bsAutoLastError||'';
-  bsSyncSetDetail((mismatch?'⚠️ Different book counts. ':'')+'Cloud saved: '+saved+(note?' · Last sync error: '+note:'')+'. Original EPUB/PDF files are stored only in this browser.');
- }catch(e){
-  if(node)node.textContent='Account: read failed';
-  bsSyncSetDetail('⚠️ Cannot read account library: '+(e.message||e)+(e.code?' · error '+e.code:'')+'. Do not delete local books or browser data.');
- }
+  const count=await bsBookCloudCount();
+  const legacy=await bsAutoReadCloud();
+  const older=Array.isArray(legacy?.books)?legacy.books.length:0;
+  if(node)node.textContent='Account: '+Math.max(count,older)+' books';
+  bsSyncSetDetail('Synced individually: '+count+' books · Legacy backup: '+older+' books · Original EPUB/PDF files stay on this device.');
+ }catch(e){bsSyncSetDetail('Cannot verify account: '+(e.message||e)+'. Keep local books and backup.')}
 }
 const bsSyncOldState=bsAutoCloudState;
 bsAutoCloudState=function(message,error=false){
