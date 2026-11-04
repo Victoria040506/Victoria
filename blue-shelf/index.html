@@ -177,7 +177,7 @@ html.bs-authenticated #bs-auth-gate{display:none !important}
 #bs-recovery-banner strong{display:block;font-size:14px}#bs-recovery-banner p{margin:3px 0 0;font-size:12px;line-height:1.5}
 #bs-recovery-banner button{background:#fff;color:#765738;border:1px solid #dcc29c;border-radius:12px;padding:10px 13px;font-weight:700;cursor:pointer}
 html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
-</style></head>
+</style><style id="bs-files-recovery-style">.bs-files-recovery{border:1px solid #c8e0e5;border-radius:20px;background:linear-gradient(115deg,#f1f9fc,#fff6f9);padding:18px 20px;margin:16px 0 22px;display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap;color:#56798c}.bs-files-recovery strong{font-size:17px}.bs-files-recovery p{margin:6px 0;font-size:13px}.bs-files-recovery-actions{display:flex;flex-wrap:wrap;gap:9px}.bs-files-recovery button:disabled{opacity:.5;cursor:not-allowed}</style></head>
 <body>
 
 <div id="bs-auth-gate" role="region" aria-label="Blue Shelf sign in">
@@ -251,7 +251,7 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
 </section>
 <section id="page-files" class="hidden">
  <div class="sectiontitle"><div><div class="eyebrow">YOUR DIGITAL BOOKS</div><h2>Import & Read 📖</h2><p class="sub">Import several EPUB and PDF files at once. Their reading copies stay on this device.</p></div></div>
- <div class="two section"><div class="panel journal-panel"><h3>📂 Add your books</h3><p class="sub">EPUB title, author and cover are read automatically when available; PDF metadata may be limited. Files never get uploaded to a server.</p><input type="file" id="ebookFiles" accept=".epub,.pdf,application/epub+zip,application/pdf" multiple><div style="margin-top:14px"><button class="primary" onclick="importEbooks()">Import selected files</button></div><p id="fileProgress" class="sub" aria-live="polite"></p></div><div class="panel journal-panel"><h3>📖 Your on-device reader</h3><p class="sub">Click Read to open a stored EPUB or PDF. Your last EPUB location will be remembered in this browser.</p><div id="myLocalFiles"></div></div></div>
+ <div id="bs-files-recovery" class="bs-files-recovery"><div><strong>🛟 Recover books from My Files</strong><p id="bs-files-recovery-count">Checking saved EPUB/PDF files on this device…</p><p class="sub">Your original files will not be moved or deleted. Cloud sync stays paused during recovery.</p><p id="bs-files-recovery-progress" role="status" aria-live="polite"></p></div><div class="bs-files-recovery-actions"><button class="secondary" type="button" onclick="bsScanFilesForRecovery()">↻ Check saved files</button><button class="primary" type="button" id="bs-files-recover-btn" onclick="bsRecoverBooksFromFiles()" disabled>♡ Restore missing books</button></div></div><div class="two section"><div class="panel journal-panel"><h3>📂 Add your books</h3><p class="sub">EPUB title, author and cover are read automatically when available; PDF metadata may be limited. Files never get uploaded to a server.</p><input type="file" id="ebookFiles" accept=".epub,.pdf,application/epub+zip,application/pdf" multiple><div style="margin-top:14px"><button class="primary" onclick="importEbooks()">Import selected files</button></div><p id="fileProgress" class="sub" aria-live="polite"></p></div><div class="panel journal-panel"><h3>📖 Your on-device reader</h3><p class="sub">Click Read to open a stored EPUB or PDF. Your last EPUB location will be remembered in this browser.</p><div id="myLocalFiles"></div></div></div>
 </section>
 <section id="page-cloud" class="hidden">
  <div class="sectiontitle"><div><div class="eyebrow">READ EVERYWHERE</div><h2>Cloud Sync ☁️</h2><p class="sub">Automatic two-way synchronization after sign-in. Book records and journal update across devices; ebook files stay local.</p></div></div>
@@ -1452,6 +1452,119 @@ bsDurableInitialization=bsDurableBoot();
  const banner=document.getElementById('bs-recovery-count');
  if(banner)banner.textContent=localCount()+' books currently stored in this browser. Export them before making changes.';
 })();
+
+
+/* My Files rescue: rebuild missing catalog entries from the independent EPUB/PDF IndexedDB store.
+   The original file records are read-only throughout recovery. */
+let bsFilesRecoveryBusy=false;
+function bsRecoveryFileKeys(){
+ return openFilesDB().then(db=>new Promise((resolve,reject)=>{
+  const tx=db.transaction('files','readonly');
+  const request=tx.objectStore('files').getAllKeys();
+  request.onsuccess=()=>{const keys=request.result;db.close();resolve(keys)};
+  request.onerror=()=>{db.close();reject(request.error||new Error('Could not list stored files'))};
+ }));
+}
+function bsRecoveryGetFile(id){
+ return openFilesDB().then(db=>new Promise((resolve,reject)=>{
+  const tx=db.transaction('files','readonly'),request=tx.objectStore('files').get(id);
+  request.onsuccess=()=>{const result=request.result;db.close();resolve(result)};
+  request.onerror=()=>{db.close();reject(request.error||new Error('Could not read stored file'))};
+ }));
+}
+function bsRecoveryCleanTitle(name){
+ return String(name||'Untitled').replace(/\.(epub|pdf)$/i,'').replace(/[_]+/g,' ').replace(/\s+/g,' ').trim().slice(0,180)||'Untitled';
+}
+function bsRecoveryFingerprint(s){return String(s||'').normalize('NFKD').toLowerCase().replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'')}
+async function bsScanFilesForRecovery(){
+ if(bsFilesRecoveryBusy)return;
+ try{
+  const keys=await bsRecoveryFileKeys();
+  const matched=new Set(books.map(b=>String(b.id)));
+  const missing=keys.filter(k=>!matched.has(String(k)));
+  const text=document.getElementById('bs-files-recovery-count');
+  text.textContent=keys.length+' EPUB/PDF files saved in My Files · '+missing.length+' file IDs not found in My Library.';
+  const button=document.getElementById('bs-files-recover-btn');
+  button.disabled=missing.length===0;
+  button.textContent=missing.length?'♡ Restore missing books ('+missing.length+')':'✓ All stored files are linked';
+ }catch(e){
+  document.getElementById('bs-files-recovery-count').textContent='Cannot inspect My Files: '+e.message;
+  document.getElementById('bs-files-recover-btn').disabled=true;
+ }
+}
+async function bsRecoverBooksFromFiles(){
+ if(bsFilesRecoveryBusy)return;
+ bsFilesRecoveryBusy=true;
+ const button=document.getElementById('bs-files-recover-btn');
+ const output=document.getElementById('bs-files-recovery-progress');
+ button.disabled=true;
+ try{
+  await bsDurableInitialization;
+  const keys=await bsRecoveryFileKeys();
+  const linked=new Set(books.map(b=>String(b.id)));
+  const missing=keys.filter(k=>!linked.has(String(k)));
+  if(!missing.length){output.textContent='All stored EPUB/PDF files already have entries in My Library.';return}
+  if(!confirm('Found '+missing.length+' saved file IDs missing from your catalog. Recover their book records into My Library? EPUB/PDF files and your existing 190+ books will be left untouched.'))return;
+  const next=books.map(b=>({...b}));
+  const byId=new Set(next.map(b=>String(b.id)));
+  const byFull=new Map(next.map(b=>[bsRecoveryFingerprint(b.title)+'|'+bsRecoveryFingerprint(b.author),b]));
+  const byTitle=new Map();
+  next.forEach(b=>{const key=bsRecoveryFingerprint(b.title);if(!byTitle.has(key))byTitle.set(key,[]);byTitle.get(key).push(b)});
+  let restored=0,linkedExisting=0,metadataErrors=0,processed=0;
+  for(const key of missing){
+   processed++;
+   const f=await bsRecoveryGetFile(key);
+   if(!f||!f.blob){metadataErrors++;continue}
+   const isEpub=f.type==='epub'||/\.epub$/i.test(f.name||'');
+   let info={title:bsRecoveryCleanTitle(f.name),author:'',cover:'',description:'',publisher:'',published:'',isbn:''};
+   if(isEpub){
+    try{
+     const detailed=await getEpubInfo(f.blob);
+     info={...info,...detailed};
+    }catch(e){metadataErrors++}
+   }
+   const title=String(info.title||bsRecoveryCleanTitle(f.name)).trim().slice(0,180)||'Untitled';
+   const author=String(info.author||'').trim().slice(0,140);
+   const fullKey=bsRecoveryFingerprint(title)+'|'+bsRecoveryFingerprint(author);
+   let current=byFull.get(fullKey);
+   if(!current){
+    const candidates=byTitle.get(bsRecoveryFingerprint(title))||[];
+    if(candidates.length===1&&(!author||!candidates[0].author))current=candidates[0];
+   }
+   if(current){linkedExisting++;}
+   else{
+    const record={
+     id:String(f.id),title,author,added:Number(f.added)||Date.now(),genre:'',
+     status:'To Be Read',rating:0,pages:0,finished:'',series:'',
+     cover:String(info.cover||''),notes:'',publisher:String(info.publisher||''),published:String(info.published||''),
+     isbn:String(info.isbn||''),language:'',description:String(info.description||''),wishlist:false
+    };
+    next.push(record);byId.add(record.id);byFull.set(fullKey,record);
+    const tk=bsRecoveryFingerprint(title);if(!byTitle.has(tk))byTitle.set(tk,[]);byTitle.get(tk).push(record);
+    restored++;
+   }
+   if(processed%10===0||processed===missing.length){
+    output.textContent='Checking '+processed+' / '+missing.length+' files · '+restored+' books ready to restore…';
+    await new Promise(resolve=>setTimeout(resolve,0));
+   }
+  }
+  if(!restored){output.textContent='No new titles found. '+linkedExisting+' saved files correspond to books already in the library.';return}
+  output.textContent='Saving '+restored+' recovered books safely to IndexedDB…';
+  await bsDurableWrite(next);
+  const verify=await bsDurableRead();
+  if(!Array.isArray(verify?.books)||verify.books.length!==next.length)throw new Error('Saved catalog could not be verified. Your old library was not changed.');
+  books=next;
+  try{localStorage.setItem(KEY,JSON.stringify(books))}catch(e){console.warn('Large catalog stored in IndexedDB, not localStorage',e)}
+  bsDurableBanner('✓ Recovered '+restored+' books from My Files. Total '+books.length+'. Export an emergency backup. Cloud sync remains paused.');
+  output.textContent='✓ Recovered '+restored+' books from My Files. Total: '+books.length+'. '+linkedExisting+' duplicate file entries skipped.'+(metadataErrors?' Some files had incomplete metadata.':'')+' Please export an emergency backup.';
+  go('library');
+  toast(restored+' books successfully recovered ♡');
+ }catch(e){output.textContent='Recovery interrupted: '+(e.message||e)+'. Your existing My Files EPUB/PDF files were not modified.';console.error('Blue Shelf recover',e)}
+ finally{bsFilesRecoveryBusy=false;await bsScanFilesForRecovery()}
+}
+// Existing My Files view can discover recovery options without importing anything.
+const bsOriginalRenderLocalFiles=renderLocalFiles;
+renderLocalFiles=async function(){await bsOriginalRenderLocalFiles();await bsScanFilesForRecovery();};
 
 </script>
 </body>
