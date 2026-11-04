@@ -280,7 +280,7 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
 .bs-bingo-hub .bs-bingo-grid.bs-bingo-monthly{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
 @media(max-width:480px){.bs-bingo-hub .bs-bingo-grid.bs-bingo-monthly .bs-bingo-square{min-height:106px;font-size:10px;padding:8px 4px}.bs-bingo-hub .bs-bingo-grid.bs-bingo-monthly{gap:5px}}
-</style></head>
+</style><style id="bs-bingo-month-theme-styles">.bs-bingo-theme-note{display:inline-block;margin:4px 0 3px;padding:9px 14px;background:linear-gradient(100deg,#e6f3fa,#f9e7f0);border:1px solid #e5ebf2;border-radius:99px;font-size:12px;font-weight:700;color:#60859d}.bs-bingo-hub .bs-bingo-grid.bs-bingo-monthly .bs-bingo-square:nth-child(-n+8){border-color:#c6dfe5;background:linear-gradient(150deg,#e9f5f5,#fff4f8)}</style></head>
 <body>
 
 <div id="bs-auth-gate" role="region" aria-label="Blue Shelf sign in">
@@ -390,7 +390,7 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
   <div class="bs-bingo-period-nav"><button type="button" aria-label="Previous period" onclick="bsBingoShift(-1)">←</button><strong id="bs-bingo-period-label"></strong><button type="button" aria-label="Next period" onclick="bsBingoShift(1)">→</button><button type="button" class="bs-bingo-now" onclick="bsBingoToday()">Today</button></div>
  </div>
  <div class="bs-bingo-summary"><div><span class="eyebrow">YOUR PROGRESS</span><strong id="bs-bingo-score">0 / 9 completed</strong><span id="bs-bingo-lines" class="bs-bingo-lines">0 bingo lines</span></div><div class="bs-bingo-meter"><div id="bs-bingo-meter-fill"></div></div></div>
- <p class="bs-bingo-help">Tap a square when you complete the prompt. A full row, column or diagonal makes a bingo! ✨</p>
+ <p id="bs-bingo-theme-note" class="bs-bingo-theme-note" aria-live="polite"></p><p class="bs-bingo-help">Tap a square when you complete the prompt. A full row, column or diagonal makes a bingo! ✨</p>
  <div id="bs-bingo-grid" class="bs-bingo-grid" aria-label="Bookish bingo challenge"></div>
  <p id="bs-bingo-cloud-status" class="bs-bingo-cloud-status" aria-live="polite">Progress is saved on this device.</p>
 </div>
@@ -1824,6 +1824,68 @@ const BS_BINGO_MONTH_PROMPTS=[
  ['🪄','Read about magic'],['🍂','Read a seasonal story'],['🌊','Read a book with a blue cover'],
  ['📝','Write a little book review'],['🧸','Reread a comforting story'],['🌟','Read something outside your comfort zone']
 ];
+const BS_BINGO_MONTH_THEMES={
+ 1:{name:'Cozy beginnings',emoji:'❄️',prompts:[
+  ['❄️','Read a book set in winter'],['🧣','Read under a warm blanket'],
+  ['✨','Begin a brand-new reading adventure'],['☕','Enjoy a book with a hot drink'],
+  ['📚','Choose your first book of the year'],['🌨️','Read while it is cold outside'],
+  ['🕯️','Read by a cozy light'],['🌙','Read on a quiet winter evening']]},
+ 2:{name:'Stories to love',emoji:'💗',prompts:[
+  ['💌','Read a story featuring a letter'],['💗','Read a book with a romance subplot'],
+  ['🩷','Choose a book with a pink or red cover'],['💕','Find a friendship worth celebrating'],
+  ['🍫','Read with a sweet treat'],['🌹','Read a book with roses on the cover'],
+  ['🥰','Meet a character you adore'],['📖','Read a story about love in any form']]},
+ 3:{name:'Spring awakening',emoji:'🌱',prompts:[
+  ['🌱','Read a book about a fresh start'],['🍀','Choose a book with a green cover'],
+  ['🌷','Read a book featuring flowers'],['🌦️','Read on a rainy spring day'],
+  ['🦋','Meet a character who transforms'],['🌿','Read outdoors if the weather allows'],
+  ['🐦','Read a book featuring an animal'],['☀️','Enjoy a sunny reading session']]},
+ 4:{name:'April showers & stories',emoji:'🌧️',prompts:[
+  ['🌧️','Read while listening to rain'],['🌈','Choose a colorful book cover'],
+  ['🌼','Read a story set in spring'],['🐣','Discover a debut author'],
+  ['☂️','Read a chapter on a rainy day'],['🌱','Try a genre new to you'],
+  ['🪻','Choose a pastel-colored cover'],['☕','Have a cozy indoor reading evening']]},
+ 5:{name:'Blooming books',emoji:'🌸',prompts:[
+  ['🌸','Read a book with flowers on the cover'],['🌿','Enjoy a reading session in nature'],
+  ['🌺','Read a story with a blooming romance'],['🦋','Choose a whimsical story'],
+  ['🌞','Read in the afternoon sunlight'],['💐','Revisit a favorite author'],
+  ['🍓','Read with a spring snack'],['🪴','Read a story about personal growth']]},
+ 6:{name:'Summer starts here',emoji:'☀️',prompts:[
+  ['☀️','Read outside on a sunny day'],['🍋','Choose a bright yellow cover'],
+  ['🏖️','Read a book set near a beach'],['🌊','Read a story with a summer setting'],
+  ['🕶️','Start a book for the holidays'],['🍦','Read while enjoying a cool treat'],
+  ['🌅','Read during a long summer evening'],['🧳','Read a story about traveling']]},
+ 7:{name:'Sunshine & adventures',emoji:'🏖️',prompts:[
+  ['🏖️','Read a book set at the seaside'],['🌊','Choose a blue-covered book'],
+  ['🍉','Read with a refreshing snack'],['⛱️','Spend a slow afternoon reading'],
+  ['🚲','Read a story about an adventure'],['🌞','Read in the sunshine'],
+  ['🧳','Visit another country through a book'],['🌴','Try a vacation-themed story']]},
+ 8:{name:'Late summer pages',emoji:'🍑',prompts:[
+  ['🌅','Read during a summer sunset'],['🍑','Choose a warm-colored cover'],
+  ['🌻','Read a book with sunshine or flowers'],['🌊','Finish a book with summer vibes'],
+  ['📚','Pick up a book you have been postponing'],['🧋','Read with a cold drink'],
+  ['🏕️','Read a story set outdoors'],['✨','Discover a new favorite before autumn']]},
+ 9:{name:'Back to books',emoji:'🍂',prompts:[
+  ['🍂','Read a story set in autumn'],['✏️','Write a little reading note'],
+  ['📚','Choose a book with an academic setting'],['🍎','Read with a cozy snack'],
+  ['🌧️','Read on a rainy afternoon'],['🧥','Read while wrapped in something warm'],
+  ['🍁','Choose an orange or brown cover'],['🕯️','Create a cozy reading atmosphere']]},
+ 10:{name:'Spooky season',emoji:'🎃',prompts:[
+  ['🎃','Read a spooky or mysterious story'],['🕯️','Read by soft light'],
+  ['👻','Read a book featuring a ghost or legend'],['🦇','Choose a dark book cover'],
+  ['🍂','Read on a chilly autumn night'],['🧙','Try a book with magic or witches'],
+  ['🕸️','Read a story full of suspense'],['🍬','Read with your favorite autumn treat']]},
+ 11:{name:'Cozy November',emoji:'☕',prompts:[
+  ['☕','Read with a hot cup of tea or cocoa'],['🍁','Choose an autumnal book cover'],
+  ['🧣','Read while wrapped in a blanket'],['🌧️','Read during a rainy afternoon'],
+  ['🕯️','Spend a cozy evening with a book'],['🌙','Read before an early winter night'],
+  ['📚','Finish a book from your autumn TBR'],['🍂','Read a story with a cozy atmosphere']]},
+ 12:{name:'Winter magic',emoji:'🎄',prompts:[
+  ['🎄','Read a festive or winter-themed story'],['❄️','Choose a book with snow on the cover'],
+  ['🎁','Read a book you received as a gift'],['☕','Read with a warm winter drink'],
+  ['✨','Read a story full of magic'],['🧦','Have a cozy holiday reading session'],
+  ['🌟','Finish one last book of the year'],['📔','Write a little year-end book reflection']]}
+};
 let bsBingoType='month',bsBingoMonthShift=0,bsBingoYearShift=0;
 let bsBingoRemoteLoaded=new Set(),bsBingoFetching=new Set(),bsBingoSaving=new Set(),bsBingoDirty=new Set();
 function bsBingoPeriod(){
@@ -1843,11 +1905,17 @@ function bsBingoWrite(period,indices){
 }
 function bsBingoPrompts(period){
  if(period.startsWith('year:'))return BS_BINGO_YEAR_PROMPTS;
- const n=Number(period.slice(6,10))*12+Number(period.slice(11,13));
- // Stable 4x4 card for each calendar month — returning to a month shows the same tasks.
- const selected=[];
- for(let i=0;i<16;i++){selected.push(BS_BINGO_MONTH_PROMPTS[(n*7+i*5)%BS_BINGO_MONTH_PROMPTS.length]);}
- return selected;
+ const month=Number(period.slice(11,13)),theme=BS_BINGO_MONTH_THEMES[month];
+ if(!theme)return BS_BINGO_MONTH_PROMPTS.slice(0,16);
+ // Eight seasonal challenges and eight varied general prompts, stable each month.
+ // The seasonal squares are always first, so the month's theme is immediately visible.
+ const n=Number(period.slice(6,10))*12+month;
+ const general=[];
+ for(let i=0;i<BS_BINGO_MONTH_PROMPTS.length&&general.length<8;i++){
+  const prompt=BS_BINGO_MONTH_PROMPTS[(n*7+i*5)%BS_BINGO_MONTH_PROMPTS.length];
+  if(!general.some(p=>p[1]===prompt[1]))general.push(prompt);
+ }
+ return [...theme.prompts,...general];
 }
 function bsBingoSetType(type){
  if(type!=='year'&&type!=='month')return;
@@ -1907,6 +1975,7 @@ function bsRenderBingo(){
  const set=new Set(checked);
  const date=year?null:new Date(Number(period.slice(6,10)),Number(period.slice(11,13))-1,1);
  $('bs-bingo-period-label').textContent=year?period.slice(5):date.toLocaleDateString('en',{month:'long',year:'numeric'});
+ const themeNote=$('bs-bingo-theme-note');if(themeNote)themeNote.textContent=year?'49 reading moments across the year ✨':BS_BINGO_MONTH_THEMES[date.getMonth()+1].emoji+' '+BS_BINGO_MONTH_THEMES[date.getMonth()+1].name+' · seasonal reading prompts';
  $('bs-bingo-tab-month').classList.toggle('active',!year);
  $('bs-bingo-tab-year').classList.toggle('active',year);
  $('bs-bingo-tab-month').setAttribute('aria-pressed',String(!year));
