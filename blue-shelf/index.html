@@ -1519,7 +1519,7 @@ async function bsRecoverBooksFromFiles(){
    let info={title:bsRecoveryCleanTitle(f.name),author:'',cover:'',description:'',publisher:'',published:'',isbn:''};
    if(isEpub){
     try{
-     const detailed=await getEpubInfo(f.blob);
+     const epubFile=(typeof File!=='undefined'&&f.blob instanceof File)?f.blob:new File([f.blob],String(f.name||'Recovered book.epub'),{type:'application/epub+zip'});const detailed=await getEpubInfo(epubFile);
      info={...info,...detailed};
     }catch(e){metadataErrors++}
    }
