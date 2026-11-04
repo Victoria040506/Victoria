@@ -185,7 +185,7 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
   <div class="bs-auth-art" aria-hidden="true">📚🌸</div>
   <h1 class="bs-auth-title">Blue Shelf ♡</h1>
   <p class="bs-auth-caption">Your cozy little corner for books.<br>Sign in to open your private library.</p>
-  <p id="bs-auth-loading" class="bs-auth-message" role="status">Checking your saved session…</p>
+  <p id="bs-auth-loading" class="bs-auth-message" role="status">Checking your saved session…</p><p id="bs-gate-net-status" class="bs-auth-message" role="status" hidden></p><button id="bs-auth-retry" class="bs-auth-signout" type="button" hidden>↻ Retry connection</button>
   <form id="bs-auth-form" hidden>
     <label for="bs-auth-email">Email address</label>
     <input id="bs-auth-email" type="email" autocomplete="email" placeholder="you@example.com" required>
@@ -1094,6 +1094,25 @@ const bsCloudAuthObserver=setInterval(()=>{
  const email=document.getElementById('bs-auth-email');
  const password=document.getElementById('bs-auth-password');
  const submit=document.getElementById('bs-auth-submit');
+ const retry=document.getElementById('bs-auth-retry');
+ const netStatus=document.getElementById('bs-gate-net-status');
+ retry.addEventListener('click',async()=>{
+  retry.disabled=true;netStatus.hidden=false;netStatus.textContent='Trying to reconnect…';
+  try{
+   if(!supa){await Promise.race([ensureClient(),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Connection timed out.')),10000))]);}
+   ready=false;await initGate();
+  }catch(e){showForm('Internet connection unavailable: '+e.message)}
+  finally{retry.disabled=false;netStatus.textContent='Your book files on this device have not been deleted.'}
+ });
+ setTimeout(()=>{
+  if(!document.documentElement.classList.contains('bs-authenticated')){
+   netStatus.hidden=false;
+   netStatus.textContent='Connection is slow. You can retry or sign in below; your local books remain on this device.';
+   retry.hidden=false;
+   if(loading&&!loading.hidden)showForm('Still connecting to your account. Try again when your connection improves.');
+  }
+ },10000);
+
  let busy=false,registered=false,ready=false;
  function showForm(message=''){
   document.documentElement.classList.remove('bs-authenticated');
@@ -1109,7 +1128,8 @@ const bsCloudAuthObserver=setInterval(()=>{
   if(busy && document.documentElement.classList.contains('bs-authenticated'))return;
   try{
    cloudUser=user;
-   if(typeof bsCloudStart==='function') await bsCloudStart();
+   // Never block the login screen while synchronizing a large library over slow internet.
+   if(typeof bsCloudStart==='function')setTimeout(()=>{Promise.resolve(bsCloudStart()).catch(e=>console.warn('Background sync after sign-in',e))},0);
    if(typeof renderCloud==='function')renderCloud();
   }catch(e){console.warn('Blue Shelf cloud refresh:',e);}
   document.documentElement.classList.add('bs-authenticated');
@@ -1121,7 +1141,7 @@ const bsCloudAuthObserver=setInterval(()=>{
   if(!supa){showForm('Connecting to your library…');return;}
   ready=true;
   try{
-   const {data,error}=await supa.auth.getUser();
+   const {data,error}=await Promise.race([supa.auth.getUser(),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Connection is taking too long. Retry or sign in when your internet improves.')),9000))]);
    if(error && error.name!=='AuthSessionMissingError')throw error;
    if(data?.user){await unlock(data.user);}
    else showForm();
@@ -1129,7 +1149,7 @@ const bsCloudAuthObserver=setInterval(()=>{
     if(event==='SIGNED_OUT'){cloudUser=null;lock('Signed out. Sign in to open your library.');}
     if(event==='SIGNED_IN'&&session?.user)setTimeout(()=>unlock(session.user),0);
    });
-  }catch(e){showForm('Could not check your session: '+e.message);}
+  }catch(e){ready=false;showForm('Could not check your session: '+e.message);document.getElementById('bs-auth-retry').hidden=false;}
  }
  async function ensureClient(){
   if(supa)return true;
@@ -1175,7 +1195,7 @@ const bsCloudAuthObserver=setInterval(()=>{
  const wait=setInterval(()=>{
   if(supa){clearInterval(wait);initGate();}
  },250);
- setTimeout(()=>{if(!ready&&!supa){clearInterval(wait);showForm('Unable to connect to Supabase. Check your internet and refresh the page.');}},12000);
+ setTimeout(()=>{if(!ready&&!supa){clearInterval(wait);showForm('Unable to connect to Supabase. Check your internet and try Retry connection.');retry.hidden=false;}},12000);
 })();
 
 
