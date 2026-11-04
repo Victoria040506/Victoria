@@ -265,12 +265,21 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
 .bs-bingo-period-nav{display:flex;align-items:center;gap:8px;justify-content:center}.bs-bingo-period-nav button{border:1px solid #dbe8f0;background:#fff;padding:8px 12px;border-radius:11px;color:#65869e;cursor:pointer}.bs-bingo-period-nav strong{min-width:135px;text-align:center;color:#4b6e89}.bs-bingo-period-nav .bs-bingo-now{font-size:12px}
 .bs-bingo-summary{display:flex;align-items:center;justify-content:space-between;gap:15px;background:#fff;border:1px solid #e8ecf0;border-radius:17px;padding:18px 20px}.bs-bingo-summary>div:first-child{display:grid;gap:4px}.bs-bingo-summary strong{color:#476985;font-size:19px}.bs-bingo-lines{font-size:12px;color:#a07391}.bs-bingo-meter{flex:0 1 220px;height:11px;background:#ebf1f5;border-radius:99px;overflow:hidden}.bs-bingo-meter>div{height:100%;width:0;background:linear-gradient(90deg,#aacde3,#c0dec8,#eac0d4);transition:width .2s}
 .bs-bingo-help,.bs-bingo-cloud-status{font-size:12px;line-height:1.6;color:#7d96a6;margin:15px 0}
-.bs-bingo-hub .bs-bingo-grid{margin:15px 0;gap:9px}.bs-bingo-hub .bs-bingo-grid.bs-bingo-yearly{grid-template-columns:repeat(5,minmax(0,1fr))}.bs-bingo-hub .bs-bingo-grid.bs-bingo-monthly{grid-template-columns:repeat(3,minmax(0,1fr))}
+.bs-bingo-hub .bs-bingo-grid{margin:15px 0;gap:9px}.bs-bingo-hub .bs-bingo-grid.bs-bingo-yearly{grid-template-columns:repeat(7,minmax(0,1fr))}.bs-bingo-hub .bs-bingo-grid.bs-bingo-monthly{grid-template-columns:repeat(4,minmax(0,1fr))}
 .bs-bingo-hub .bs-bingo-square{min-height:115px;position:relative;padding:13px 8px;border-radius:16px;font-size:12px;line-height:1.35;transition:transform .15s,box-shadow .15s}.bs-bingo-hub .bs-bingo-square:hover{transform:translateY(-2px);box-shadow:0 7px 14px #9ab4c327}
 .bs-bingo-hub .bs-bingo-square.done{background:linear-gradient(145deg,#dbf1e8,#e8f3fa);border-color:#a7d0bc;color:#517e6c}.bs-bingo-hub .bs-bingo-square.bs-bingo-free{background:linear-gradient(140deg,#f6dce9,#e7effc);border-color:#e4c7d9;color:#9a708e;cursor:default}
 .bs-bingo-hub .bs-bingo-square-icon{font-size:22px}.bs-bingo-hub .bs-bingo-square-text{font-weight:650;overflow-wrap:anywhere}.bs-bingo-hub .bs-bingo-square:focus-visible{outline:3px solid #7facc6;outline-offset:2px}
 @media(max-width:720px){.bs-bingo-hub{padding:17px}.bs-bingo-hub .bs-bingo-square{min-height:90px;font-size:10px;padding:8px 3px}.bs-bingo-hub .bs-bingo-square-icon{font-size:18px}.bs-bingo-hub .bs-bingo-grid{gap:5px}.bs-bingo-period-nav strong{min-width:110px}}
 @media(max-width:440px){.bs-bingo-hub .bs-bingo-grid.bs-bingo-yearly{gap:3px}.bs-bingo-hub .bs-bingo-yearly .bs-bingo-square{min-height:86px;font-size:9px;padding:6px 2px;border-radius:9px}.bs-bingo-hub .bs-bingo-yearly .bs-bingo-square-icon{font-size:15px}.bs-bingo-summary{flex-wrap:wrap}.bs-bingo-meter{flex-basis:100%}}
+
+.bs-bingo-hub .bs-bingo-grid.bs-bingo-yearly .bs-bingo-square{min-height:105px;font-size:11px;padding:9px 6px}
+@media(max-width:850px){
+.bs-bingo-hub{overflow-x:auto}
+.bs-bingo-hub .bs-bingo-grid.bs-bingo-yearly{min-width:770px;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px}
+.bs-bingo-hub .bs-bingo-grid.bs-bingo-yearly .bs-bingo-square{min-height:99px;font-size:11px;padding:8px 6px;border-radius:12px}
+.bs-bingo-hub .bs-bingo-grid.bs-bingo-monthly{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(max-width:480px){.bs-bingo-hub .bs-bingo-grid.bs-bingo-monthly .bs-bingo-square{min-height:106px;font-size:10px;padding:8px 4px}.bs-bingo-hub .bs-bingo-grid.bs-bingo-monthly{gap:5px}}
 </style></head>
 <body>
 
@@ -1767,7 +1776,7 @@ const BS_BINGO_YEAR_PROMPTS=[
  ['🌊','Read a story set near water'],
  ['🦋','Choose a book by its beautiful cover'],
  ['🪄','Finish a book with a magical element'],
- ['♡','FREE SPACE — little reading joy'],
+ ['📗','Read a graphic novel or illustrated book'],
  ['🍂','Read a book set in autumn or winter'],
  ['✉','Read a book recommended to you'],
  ['🌷','Read a book with a pastel cover'],
@@ -1779,7 +1788,31 @@ const BS_BINGO_YEAR_PROMPTS=[
  ['🍰','Read a book with food in the story'],
  ['🧩','Read something that surprises you'],
  ['📜','Read a classic or older book'],
- ['✨','Finish a story you will remember']
+ ['♡','FREE SPACE — little reading joy'],
+ ['✨','Finish a story you will remember'],
+ ['🌆','Read a book set in a city'],
+ ['🧡','Give a second chance to a book you paused'],
+ ['🐈','Read a book featuring an animal'],
+ ['🎭','Read a story with an unforgettable villain'],
+ ['💌','Read a story with a friendship you love'],
+ ['🌧','Read while listening to the rain'],
+ ['🗺','Read a book set in another country'],
+ ['📚','Finish a book over 400 pages'],
+ ['🪶','Read a novella or a short story'],
+ ['🌌','Read a science fiction book'],
+ ['🌻','Read a book with a yellow cover'],
+ ['🏰','Read a book set in the past'],
+ ['🧁','Discover a cozy mystery'],
+ ['🌱','Read a debut novel'],
+ ['🎧','Try an audiobook'],
+ ['📓','Write a review in your Reading Journal'],
+ ['🎨','Read a book with striking cover art'],
+ ['🌺','Read a romance story'],
+ ['🌲','Read a story set in nature'],
+ ['🔮','Read a book about a legend or myth'],
+ ['❄','Read a book during the winter'],
+ ['🍓','Read a book with a colorful cover'],
+ ['💫','Find a book you want to recommend']
 ];
 const BS_BINGO_MONTH_PROMPTS=[
  ['📚','Read a book from your TBR'],['☕','Enjoy a cozy reading session'],['✨','Try a new author'],
@@ -1803,7 +1836,7 @@ function bsBingoKey(period){
  return 'bs-bingo-period-v2:'+(cloudUser?.id||'local')+':'+period;
 }
 function bsBingoRead(period){
- try{const v=JSON.parse(localStorage.getItem(bsBingoKey(period))||'[]');return Array.isArray(v)?v.filter(x=>Number.isInteger(x)&&x>=0&&x<25):[]}catch{return []}
+ try{const v=JSON.parse(localStorage.getItem(bsBingoKey(period))||'[]');return Array.isArray(v)?v.filter(x=>Number.isInteger(x)&&x>=0&&x<49):[]}catch{return []}
 }
 function bsBingoWrite(period,indices){
  try{localStorage.setItem(bsBingoKey(period),JSON.stringify(indices));return true}catch(e){$('bs-bingo-cloud-status').textContent='⚠ Could not save progress on this device. Free up storage first.';return false}
@@ -1811,9 +1844,9 @@ function bsBingoWrite(period,indices){
 function bsBingoPrompts(period){
  if(period.startsWith('year:'))return BS_BINGO_YEAR_PROMPTS;
  const n=Number(period.slice(6,10))*12+Number(period.slice(11,13));
- // Stable 3x3 card for each calendar month — returning to a month shows the same tasks.
+ // Stable 4x4 card for each calendar month — returning to a month shows the same tasks.
  const selected=[];
- for(let i=0;i<9;i++){selected.push(BS_BINGO_MONTH_PROMPTS[(n*7+i*5)%BS_BINGO_MONTH_PROMPTS.length]);}
+ for(let i=0;i<16;i++){selected.push(BS_BINGO_MONTH_PROMPTS[(n*7+i*5)%BS_BINGO_MONTH_PROMPTS.length]);}
  return selected;
 }
 function bsBingoSetType(type){
@@ -1846,7 +1879,7 @@ function bsBingoLegacyMigration(period){
 }
 function bsBingoLines(indices,side){
  const active=new Set(indices);
- if(side===5)active.add(12); // the annual middle square is a free space
+ if(side===7)active.add(24); // the annual middle square is a free space
  const lines=[];
  for(let i=0;i<side;i++){
   lines.push(Array.from({length:side},(_,j)=>i*side+j));
@@ -1858,7 +1891,7 @@ function bsBingoLines(indices,side){
 }
 function bsToggleBingo(index){
  const period=bsBingoPeriod(),prompts=bsBingoPrompts(period);
- if(!Number.isInteger(index)||index<0||index>=prompts.length||period.startsWith('year:')&&index===12)return;
+ if(!Number.isInteger(index)||index<0||index>=prompts.length||period.startsWith('year:')&&index===24)return;
  const old=bsBingoRead(period),selected=new Set(old);
  if(selected.has(index))selected.delete(index);else selected.add(index);
  const next=[...selected].sort((a,b)=>a-b);
@@ -1870,7 +1903,7 @@ function bsToggleBingo(index){
 function bsRenderBingo(){
  const node=$('bs-bingo-grid');if(!node)return;
  const period=bsBingoPeriod();bsBingoLegacyMigration(period);
- const year=period.startsWith('year:'),side=year?5:3,prompts=bsBingoPrompts(period),checked=bsBingoRead(period);
+ const year=period.startsWith('year:'),side=year?7:4,prompts=bsBingoPrompts(period),checked=bsBingoRead(period);
  const set=new Set(checked);
  const date=year?null:new Date(Number(period.slice(6,10)),Number(period.slice(11,13))-1,1);
  $('bs-bingo-period-label').textContent=year?period.slice(5):date.toLocaleDateString('en',{month:'long',year:'numeric'});
@@ -1882,7 +1915,7 @@ function bsRenderBingo(){
  node.classList.toggle('bs-bingo-monthly',!year);
  node.replaceChildren();
  prompts.forEach(([emoji,prompt],index)=>{
-  const free=year&&index===12,done=free||set.has(index);
+  const free=year&&index===24,done=free||set.has(index);
   const button=document.createElement('button');button.type='button';
   button.className='bs-bingo-square'+(done?' done':'')+(free?' bs-bingo-free':'');
   button.setAttribute('aria-pressed',String(done));
@@ -1892,7 +1925,7 @@ function bsRenderBingo(){
   const label=document.createElement('span');label.className='bs-bingo-square-text';label.textContent=prompt;
   button.append(icon,label);if(!free)button.onclick=()=>bsToggleBingo(index);node.append(button);
  });
- const score=checked.filter(i=>i<prompts.length&&!(year&&i===12)).length,goal=year?24:9,lines=bsBingoLines(checked,side);
+ const score=checked.filter(i=>i<prompts.length&&!(year&&i===24)).length,goal=year?48:16,lines=bsBingoLines(checked,side);
  $('bs-bingo-score').textContent=score+' / '+goal+' prompts completed';
  $('bs-bingo-lines').textContent=lines+' bingo line'+(lines===1?'':'s')+(lines?' ✨':'');
  $('bs-bingo-meter-fill').style.width=Math.min(100,100*score/goal)+'%';
