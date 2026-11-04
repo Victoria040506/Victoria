@@ -250,6 +250,13 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
 #page-journal .bs-journal-entry-footer{display:flex;justify-content:space-between;gap:8px;align-items:center;border-top:1px solid #edf1f4;margin-top:10px;padding-top:9px;font-size:10px;color:#899ca9}#page-journal .bs-journal-entry-footer button{border:0;background:transparent;color:#557c9a;font-weight:700;cursor:pointer}
 #page-journal .bs-journal-empty{text-align:center;padding:35px 12px;color:#afc2ce;font-size:28px}#page-journal .bs-journal-empty p{font-size:14px;color:#6f8ba0}#page-journal .bs-journal-empty small{display:block;font-size:12px}
 @media(max-width:600px){#page-journal .bs-journal-hero{padding:23px}#page-journal .bs-journal-hero-decoration{display:none}#page-journal .journal-panel{padding:18px}}
+</style><style id="bs-bookshelf-fit-v2">
+#virtualShelves .bs-shelf-fitted{padding:19px 20px 13px;margin:15px 0 21px;min-height:0;overflow:hidden}
+#virtualShelves .bs-shelf-fitted .shelf-row{display:flex;flex-wrap:nowrap;align-items:flex-end;gap:4px;min-height:155px;width:100%;overflow:hidden}
+#virtualShelves .bs-shelf-fitted .book-spine{flex:1 1 var(--bs-spine-base,32px);width:auto!important;min-width:0;max-width:none;box-sizing:border-box;padding:9px 3px;border-left-width:3px;font-size:11px;letter-spacing:0;line-height:1.2;overflow:hidden;text-overflow:ellipsis}
+#virtualShelves .bs-shelf-fitted .bs-shelf-partial-row .book-spine{flex:0 0 var(--bs-spine-base,32px);max-width:42px}
+#virtualShelves .bs-shelf-fitted .shelf-plank{margin-top:1px}
+@media(max-width:620px){#virtualShelves .bs-shelf-fitted{padding:12px 11px 10px;border-radius:18px}#virtualShelves .bs-shelf-fitted .shelf-row{gap:3px}#virtualShelves .bs-shelf-fitted .book-spine{font-size:10px;padding:8px 2px}}
 </style></head>
 <body>
 
@@ -1187,14 +1194,19 @@ function bsShelfMoveBook(shelf,bookId,targetId){
 function bsDrawShelf(bookList,target,shelfName=''){
  const palettes={pastel:['#bddae9','#ecc7d9','#dce8cb','#e6d6ef','#f0dbc7','#b9d4d2','#c4cee5'],blue:['#c0e2f5','#b1d5ed','#d8ecf7','#a8cae4'],pink:['#f3cedd','#f9e1e9','#e9bfd2','#f5d7e2'],sage:['#d4e5d2','#bcd4c6','#e3e8c9','#b5ccc0']};
  const colors=palettes[readerSettings.shelfPalette]||palettes.pastel;
- for(let i=0;i<bookList.length;i+=22){
-  const board=document.createElement('div');board.className='shelf-board';
+ // Fit as many spines as the actual shelf width allows instead of always using 22.
+ const available=Math.max(260,target.clientWidth||$('virtualShelves')?.clientWidth||900)-38;
+ const perRow=Math.max(5,Math.min(40,Math.floor((available+5)/40)));
+ for(let i=0;i<bookList.length;i+=perRow){
+  const board=document.createElement('div');board.className='shelf-board bs-shelf-fitted';
   const spineRow=document.createElement('div');spineRow.className='shelf-row';
-  bookList.slice(i,i+22).forEach((b,j)=>{
+  const rowBooks=bookList.slice(i,i+perRow);
+  if(rowBooks.length<perRow)spineRow.classList.add('bs-shelf-partial-row');
+  rowBooks.forEach((b,j)=>{
    const btn=document.createElement('button');btn.type='button';btn.className='book-spine';
    btn.title=(b.title||'Book')+' — '+(b.author||'');
    btn.textContent=(b.title||'Untitled').slice(0,55);
-   btn.style.background=colors[(i+j)%colors.length];btn.style.height=(105+(i+j)%5*10)+'px';btn.style.width=(28+(i+j)%3*5)+'px';
+   btn.style.background=colors[(i+j)%colors.length];btn.style.height=(115+(i+j)%5*9)+'px';btn.style.setProperty('--bs-spine-base',(29+(i+j)%3*3)+'px');
    btn.onclick=()=>openForm(b.id);
    if(shelfName){
     btn.draggable=true;
@@ -1209,7 +1221,17 @@ function bsDrawShelf(bookList,target,shelfName=''){
  }
 }
 // This function intentionally overrides the original shelf rendering, retaining its appearance.
-function renderBookshelf(){const node=$('virtualShelves');if(!node)return;populateCustomShelfControls();let q=($('shelfSearch')?.value||'').toLowerCase(),status=$('shelfFilter')?.value||'',mode=$('shelfGroup')?.value||'all';let all=books.filter(b=>(!status||b.status===status)&&(!q||(b.title+' '+b.author).toLowerCase().includes(q)));const sort=$('bsShelfSort')?.value||'title';if($('bsShelfPalette'))$('bsShelfPalette').value=readerSettings.shelfPalette||'pastel';node.replaceChildren();let groups={};if(mode==='collection'){for(const [name,ids] of Object.entries(customShelves))groups[name]=ids.map(id=>all.find(b=>b.id===id)).filter(Boolean);}else if(mode==='series'||mode==='genre'){for(const b of all){let group=(b[mode]||'Unsorted').trim()||'Unsorted';(groups[group]??=[]).push(b)}}else groups={'My books':all};for(const [name,list] of Object.entries(groups).sort((a,b)=>a[0].localeCompare(b[0]))){const title=document.createElement('h3');title.className='bs-shelf-heading';title.textContent=name+' · '+list.length;node.append(title);if(list.length){if(!(mode==='collection'&&sort==='custom'))list.sort((a,b)=>sort==='recent'?(Number(b.added)||0)-(Number(a.added)||0):sort==='pages'?(Number(b.pages)||0)-(Number(a.pages)||0):(a.title||'').localeCompare(b.title||''));bsDrawShelf(list,node,mode==='collection'?name:'')} else {let p=document.createElement('p');p.className='sub';p.textContent='This shelf is empty.';node.append(p)}}if(!Object.keys(groups).length){node.innerHTML='<p class="sub">Create a shelf to organize your stories 🎀</p>'}$('customShelfState').textContent=Object.keys(customShelves).length+' custom shelves · Drag spines in a custom shelf to change their order.'}
+function renderBookshelf(){const node=$('virtualShelves');if(!node)return;bsShelfPreviousWidth=node.clientWidth;populateCustomShelfControls();let q=($('shelfSearch')?.value||'').toLowerCase(),status=$('shelfFilter')?.value||'',mode=$('shelfGroup')?.value||'all';let all=books.filter(b=>(!status||b.status===status)&&(!q||(b.title+' '+b.author).toLowerCase().includes(q)));const sort=$('bsShelfSort')?.value||'title';if($('bsShelfPalette'))$('bsShelfPalette').value=readerSettings.shelfPalette||'pastel';node.replaceChildren();let groups={};if(mode==='collection'){for(const [name,ids] of Object.entries(customShelves))groups[name]=ids.map(id=>all.find(b=>b.id===id)).filter(Boolean);}else if(mode==='series'||mode==='genre'){for(const b of all){let group=(b[mode]||'Unsorted').trim()||'Unsorted';(groups[group]??=[]).push(b)}}else groups={'My books':all};for(const [name,list] of Object.entries(groups).sort((a,b)=>a[0].localeCompare(b[0]))){const title=document.createElement('h3');title.className='bs-shelf-heading';title.textContent=name+' · '+list.length;node.append(title);if(list.length){if(!(mode==='collection'&&sort==='custom'))list.sort((a,b)=>sort==='recent'?(Number(b.added)||0)-(Number(a.added)||0):sort==='pages'?(Number(b.pages)||0)-(Number(a.pages)||0):(a.title||'').localeCompare(b.title||''));bsDrawShelf(list,node,mode==='collection'?name:'')} else {let p=document.createElement('p');p.className='sub';p.textContent='This shelf is empty.';node.append(p)}}if(!Object.keys(groups).length){node.innerHTML='<p class="sub">Create a shelf to organize your stories 🎀</p>'}$('customShelfState').textContent=Object.keys(customShelves).length+' custom shelves · Drag spines in a custom shelf to change their order.'}
+// Rebuild bookshelf rows only when the available width actually changes.
+let bsShelfResizeTimer=null,bsShelfPreviousWidth=0;
+window.addEventListener('resize',()=>{
+ if($('page-bookshelf')?.classList.contains('hidden'))return;
+ clearTimeout(bsShelfResizeTimer);
+ bsShelfResizeTimer=setTimeout(()=>{
+  const w=$('virtualShelves')?.clientWidth||0;
+  if(Math.abs(w-bsShelfPreviousWidth)>25){bsShelfPreviousWidth=w;renderBookshelf();}
+ },220);
+});
 function getChallengeCards(){const now=new Date(),year=now.getFullYear(),month=bsToday().slice(0,7);const read=books.filter(b=>b.status==='Read'&&String(b.finished||'').startsWith(String(year)));const monthly=books.filter(b=>b.status==='Read'&&String(b.finished||'').startsWith(month));const monthPages=readingSessions.filter(x=>bsMonthKey(x.date)===month).reduce((a,x)=>a+(Number(x.pages)||0),0);const goalGen=String(challengeGoals.genre||'').trim().toLowerCase();const genreCount=read.filter(b=>goalGen&&String(b.genre||'').toLowerCase().includes(goalGen)).length;return [{title:'Annual books',value:read.length,target:getGoal(),unit:'books'},{title:'Monthly books',value:monthly.length,target:Number(challengeGoals.month)||4,unit:'books'},{title:'Monthly reading pages',value:monthPages,target:Number(challengeGoals.pages)||1000,unit:'pages'},{title:'Explore '+(challengeGoals.genre||'a genre'),value:genreCount,target:3,unit:'books'}]}
 function renderChallenges(){if(!$('challengeCards'))return;$('challengeYearGoal').value=getGoal();$('challengeMonthGoal').value=challengeGoals.month??4;$('challengePageGoal').value=challengeGoals.pages??1000;$('challengeGenre').value=challengeGoals.genre||'';$('challengeCards').innerHTML=getChallengeCards().map(c=>`<div class="bs-challenge"><div class="sub">${esc(c.title)}</div><strong>${c.value} / ${c.target}</strong><div class="bs-meter"><span style="width:${Math.min(100,Math.round(100*c.value/Math.max(1,c.target)))}%"></span></div><div class="sub">${esc(c.unit)} · ${Math.min(100,Math.round(100*c.value/Math.max(1,c.target)))}% of your goal</div></div>`).join('');let all=books.filter(b=>b.status==='Read').length,days=new Set(readingSessions.map(s=>s.date)).size,total=readingSessions.reduce((a,s)=>a+Number(s.minutes||0),0);let badges=[['📚 First chapter',all>=1],['🌷 Five books',all>=5],['✨ Twenty books',all>=20],['☕ One hour reading',total>=60],['🌿 Seven reading days',days>=7],['🎀 Fifty books',all>=50]];$('challengeBadges').innerHTML=badges.map(([name,ok])=>`<div class="bs-achievement ${ok?'unlocked':''}">${ok?'✓ ':'○ '}${esc(name)}</div>`).join('')}
 function saveChallenges(){const year=Number($('challengeYearGoal').value),month=Number($('challengeMonthGoal').value),pages=Number($('challengePageGoal').value);if(!Number.isInteger(year)||year<1||year>9999||!Number.isInteger(month)||month<1||month>500||!Number.isInteger(pages)||pages<1||pages>100000)return toast('Choose valid goal values');challengeGoals={month,pages,genre:$('challengeGenre').value.trim().slice(0,50)};bsWrite(BS_CHALLENGES,challengeGoals);localStorage.setItem(GOAL,String(year));$('challengeSaveState').textContent='✓ Saved in this browser';renderChallenges()}
