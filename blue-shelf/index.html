@@ -220,6 +220,16 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
 #page-stats .genrebar .bar{background:linear-gradient(90deg,#a9cde2,#d7b7ce)}
 #page-stats .bs-stats-author-panel .bs-author-line{background:#f4f8fb;border:1px solid #e9eff4;padding:13px;border-radius:14px}
 @media(max-width:700px){#page-stats .bs-stats-hero{padding:25px 19px}}
+</style><style id="bs-quick-reading-editor-css">
+.bs-quick-book{margin:26px 0 12px;padding:25px;border:1px solid #e4eaf0;border-radius:23px;background:linear-gradient(140deg,#f3f9fc,#fffafb 70%);color:#47627b}
+.bs-quick-heading{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:24px}.bs-quick-heading h3{font:600 27px 'Playfair Display',Georgia,serif;color:#456c89;margin:6px 0}.bs-quick-heading p{color:#8396a5;font-size:13px;margin:0}.bs-quick-heading>span{font-size:27px}
+.bs-quick-field{display:block;font-size:13px;font-weight:700;color:#587b93;margin:0 0 17px}.bs-quick-label{display:block;margin-bottom:10px}.bs-quick-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.bs-quick-dates{grid-template-columns:repeat(2,minmax(0,1fr))}
+.bs-quick-field input,.bs-quick-field textarea{width:100%;margin-top:8px;border:1px solid #dbe8ee;border-radius:12px;padding:11px 12px;font:500 14px 'DM Sans',sans-serif;background:#fff;min-width:0;color:#49677e}.bs-quick-field textarea{resize:vertical;line-height:1.7}
+.bs-quick-statuses{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:17px}.bs-quick-status{border:1px solid #d8e5ed;background:white;color:#63829b;padding:9px 13px;border-radius:12px;font-size:12px;cursor:pointer;font-weight:700}.bs-quick-status.active{background:#dceef8;border-color:#95bed7;color:#416f90;box-shadow:inset 0 0 0 1px #a6cbe0}
+.bs-quick-progress-track{height:11px;border-radius:99px;background:#e6edf1;overflow:hidden}.bs-quick-progress-track>div{height:100%;border-radius:99px;background:linear-gradient(90deg,#a4ccdc,#b9ddc8,#e1bcd0);transition:width .2s}.bs-quick-help{font-size:12px;color:#8da1af;line-height:1.5;margin:8px 0 21px}
+.bs-quick-rating{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.bs-quick-stars{display:flex;gap:2px}.bs-quick-star{border:0;background:transparent;font-size:28px;color:#cbd7df;cursor:pointer;padding:1px 3px;line-height:1}.bs-quick-star.selected{color:#d9b26b}.bs-quick-rating>span{font-weight:500;font-size:12px;color:#7c96a5}.bs-quick-clear{border:0;background:transparent;font-size:12px;color:#a47a91;text-decoration:underline;cursor:pointer}
+.bs-quick-actions{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;border-top:1px solid #e5ecf1;padding-top:16px;margin-top:18px}.bs-quick-actions span{font-size:12px;color:#66899b;flex:1}
+@media(max-width:570px){.bs-quick-book{padding:17px}.bs-quick-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.bs-quick-heading h3{font-size:23px}}
 </style></head>
 <body>
 
@@ -619,8 +629,93 @@ function fillFromOnline(){
   $('finderQuery').value=[title,author].filter(Boolean).join(' ');
   searchBooks();
 }
-function saveBook(e,id){e.preventDefault();let f=new FormData(e.target),title=String(f.get('title')||'').trim();if(!title)return;let previous=books.find(b=>b.id===id);let b={id:previous?.id||('b'+Date.now()+Math.random().toString(36).slice(2)),added:previous?.added||Date.now(),title,author:String(f.get('author')||'').trim(),genre:String(f.get('genre')||'').trim(),status:String(f.get('status')),rating:Number(f.get('rating'))||0,pages:Number(f.get('pages'))||0,finished:String(f.get('finished')||''),series:String(f.get('series')||'').trim(),cover:String(f.get('cover')||'').trim(),notes:String(f.get('notes')||'').trim(),publisher:String(f.get('publisher')||'').trim(),published:String(f.get('published')||'').trim(),isbn:String(f.get('isbn')||'').trim(),language:String(f.get('language')||'').trim(),description:cleanDescription(f.get('description')).trim(),metadataSource:previous?.metadataSource||'',pagesApproximate:previous?.pagesApproximate||false,pagesSource:previous?.pagesSource||'',wishlist:f.has('wishlist')};if(previous)books=books.map(x=>x.id===id?b:x);else books.push(b);store();closeModal();go(document.querySelector('[data-nav].active')?.dataset.nav||'library');toast(previous?'Book updated!':'Book added!')}
-function detail(id){let b=books.find(x=>x.id===id);if(!b)return;$('modalTitle').textContent='Book details';$('modalBody').innerHTML=`<div class="detail">${cover(b)}<div><div class="eyebrow">${esc(b.genre||'MY LIBRARY')}</div><h3>${esc(b.title)}</h3><p class="muted">by ${esc(b.author||'Unknown author')}</p><div class="detailmeta"><span class="tag">${esc(b.status)}</span>${b.rating?`<span class="tag">★ ${b.rating}/5</span>`:''}${b.pages?`<span class="tag">${b.pages} pages</span>`:''}${b.wishlist?'<span class="tag">♡ Wishlist</span>':''}${b.pagesApproximate?'<span class="tag" title="Page count may refer to another edition">≈ pages from another edition</span>':''}</div>${b.published?`<p><b>Published:</b> ${esc(b.published)}</p>`:''}${b.publisher?`<p><b>Publisher:</b> ${esc(b.publisher)}</p>`:''}${b.isbn?`<p><b>ISBN:</b> ${esc(b.isbn)}</p>`:''}${b.language?`<p><b>Language:</b> ${esc(b.language)}</p>`:''}${b.series?`<p><b>Series:</b> ${esc(b.series)}</p>`:''}${b.finished?`<p><b>Finished:</b> ${esc(b.finished)}</p>`:''}</div></div>${b.description?`<div class="section"><b>About this book</b><p style="white-space:pre-wrap;line-height:1.7">${esc(cleanDescription(b.description))}</p></div>`:''}${b.notes?`<div class="section"><b>My notes</b><p style="white-space:pre-wrap;line-height:1.7">${esc(b.notes)}</p></div>`:''}<div class="actions"><button class="secondary" onclick="closeModal()">Close</button><button class="secondary" onclick="openForm('${esc(b.id)}');fillFromOnline()">Find more details ✦</button><button class="primary" onclick="openForm('${esc(b.id)}')">Edit book</button></div>`;showModal()}
+function saveBook(e,id){e.preventDefault();let f=new FormData(e.target),title=String(f.get('title')||'').trim();if(!title)return;let previous=books.find(b=>b.id===id);let b={id:previous?.id||('b'+Date.now()+Math.random().toString(36).slice(2)),added:previous?.added||Date.now(),title,author:String(f.get('author')||'').trim(),genre:String(f.get('genre')||'').trim(),status:String(f.get('status')),rating:Number(f.get('rating'))||0,pages:Number(f.get('pages'))||0,finished:String(f.get('finished')||''),series:String(f.get('series')||'').trim(),cover:String(f.get('cover')||'').trim(),notes:String(f.get('notes')||'').trim(),publisher:String(f.get('publisher')||'').trim(),published:String(f.get('published')||'').trim(),isbn:String(f.get('isbn')||'').trim(),language:String(f.get('language')||'').trim(),description:cleanDescription(f.get('description')).trim(),metadataSource:previous?.metadataSource||'',pagesApproximate:previous?.pagesApproximate||false,pagesSource:previous?.pagesSource||'',currentPage:previous?.currentPage||0,progressPercent:previous?.progressPercent||0,started:previous?.started||'',wishlist:f.has('wishlist')};if(previous)books=books.map(x=>x.id===id?b:x);else books.push(b);store();closeModal();go(document.querySelector('[data-nav].active')?.dataset.nav||'library');toast(previous?'Book updated!':'Book added!')}
+function detail(id){
+ const b=books.find(x=>x.id===id);if(!b)return;
+ $('modalTitle').textContent='Book details';
+ const pct=Number.isFinite(+b.progressPercent)?Math.max(0,Math.min(100,Number(b.progressPercent)||0)):0;
+ const pages=Math.max(0,Number(b.pages)||0),current=Math.max(0,Number(b.currentPage)||0);
+ const percent=pages&&current?Math.min(100,Math.round(100*current/pages)):pct;
+ const status=['To Be Read','Currently Reading','Read','DNF'].includes(b.status)?b.status:'To Be Read';
+ const starRating=Math.max(0,Math.min(5,Number(b.rating)||0));
+ const stars=Array.from({length:5},(_,i)=>`<button type="button" class="bs-quick-star ${starRating>=i+1?'selected':''}" onclick="bsQuickRating(${i+1})" aria-label="Rate ${i+1} stars" title="${i+1} stars">★</button>`).join('');
+ const statusButtons=['To Be Read','Currently Reading','Read','DNF'].map(v=>`<button type="button" class="bs-quick-status ${status===v?'active':''}" aria-pressed="${status===v}" onclick="bsQuickStatus(this)">${esc(v)}</button>`).join('');
+ $('modalBody').innerHTML=`<div class="detail">${cover(b)}<div><div class="eyebrow">${esc(b.genre||'MY LIBRARY')}</div><h3>${esc(b.title)}</h3><p class="muted">by ${esc(b.author||'Unknown author')}</p><div class="detailmeta"><span class="tag">${esc(b.status||'To Be Read')}</span>${b.rating?`<span class="tag">★ ${esc(b.rating)}/5</span>`:''}${b.pages?`<span class="tag">${esc(b.pages)} pages</span>`:''}${b.wishlist?'<span class="tag">♡ Wishlist</span>':''}${b.pagesApproximate?'<span class="tag" title="Page count may refer to another edition">≈ pages from another edition</span>':''}</div>${b.published?`<p><b>Published:</b> ${esc(b.published)}</p>`:''}${b.publisher?`<p><b>Publisher:</b> ${esc(b.publisher)}</p>`:''}${b.isbn?`<p><b>ISBN:</b> ${esc(b.isbn)}</p>`:''}${b.language?`<p><b>Language:</b> ${esc(b.language)}</p>`:''}${b.series?`<p><b>Series:</b> ${esc(b.series)}</p>`:''}</div></div>
+ <form id="bs-quick-book-form" class="bs-quick-book" onsubmit="bsQuickSave(event,'${esc(b.id)}')">
+  <div class="bs-quick-heading"><div><span class="eyebrow">✿ YOUR READING CORNER</span><h3>My reading journey ♡</h3><p>Update your progress, rating and reading notes without leaving this book.</p></div><span aria-hidden="true">📖</span></div>
+  <div class="bs-quick-field"><span class="bs-quick-label">Reading status</span><div id="bs-quick-statuses" class="bs-quick-statuses">${statusButtons}</div><input type="hidden" id="bs-quick-status" value="${esc(status)}"></div>
+  <div class="bs-quick-fields"><label class="bs-quick-field">Current page<input id="bs-quick-page" type="number" min="0" max="100000" step="1" placeholder="0" value="${current||''}" oninput="bsQuickProgress('page')"></label><label class="bs-quick-field">Total pages<input id="bs-quick-total" type="number" min="0" max="100000" step="1" placeholder="Unknown" value="${pages||''}" oninput="bsQuickProgress('total')"></label><label class="bs-quick-field">Progress (%)<input id="bs-quick-percent" type="number" min="0" max="100" step="1" value="${percent}" oninput="bsQuickProgress('percent')"></label></div>
+  <div class="bs-quick-progress-track" role="progressbar" aria-label="Reading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}"><div id="bs-quick-progress-fill" style="width:${percent}%"></div></div>
+  <p id="bs-quick-progress-hint" class="bs-quick-help">Progress can be entered by page or percent. Page calculations need a total page count.</p>
+  <div class="bs-quick-field"><span class="bs-quick-label">My rating</span><div class="bs-quick-rating"><div id="bs-quick-stars" class="bs-quick-stars">${stars}</div><span id="bs-quick-rating-label">${starRating?starRating+' / 5':'Not rated yet'}</span><button type="button" class="bs-quick-clear" onclick="bsQuickRating(0)">Clear</button></div><input type="hidden" id="bs-quick-rating" value="${starRating}"></div>
+  <div class="bs-quick-fields bs-quick-dates"><label class="bs-quick-field">Started reading<input id="bs-quick-started" type="date" value="${esc(b.started||'')}"></label><label class="bs-quick-field">Finished reading<input id="bs-quick-finished" type="date" value="${esc(b.finished||'')}"></label></div>
+  <label class="bs-quick-field">My thoughts<textarea id="bs-quick-notes" rows="3" maxlength="6000" placeholder="Your notes, thoughts or a little review...">${esc(b.notes||'')}</textarea></label>
+  <div class="bs-quick-actions"><span id="bs-quick-save-state" role="status" aria-live="polite">Changes are saved when you press Save.</span><button type="submit" id="bs-quick-save" class="primary">Save reading updates ♡</button></div>
+ </form>
+ ${b.description?`<div class="section"><b>About this book</b><p style="white-space:pre-wrap;line-height:1.7">${esc(cleanDescription(b.description))}</p></div>`:''}
+ <div class="actions"><button class="secondary" onclick="closeModal()">Close</button><button class="secondary" onclick="openForm('${esc(b.id)}');fillFromOnline()">Find more details ✦</button><button class="secondary" onclick="openForm('${esc(b.id)}')">Edit all details</button></div>`;
+ showModal();
+}
+function bsQuickStatus(btn){
+ const val=btn.textContent.trim();
+ if(!['To Be Read','Currently Reading','Read','DNF'].includes(val))return;
+ $('bs-quick-status').value=val;
+ document.querySelectorAll('#bs-quick-statuses button').forEach(x=>{const on=x===btn;x.classList.toggle('active',on);x.setAttribute('aria-pressed',String(on))});
+ if(val==='Read'){
+  if(!$('bs-quick-finished').value)$('bs-quick-finished').value=new Date().toLocaleDateString('sv-SE');
+  if(!$('bs-quick-percent').value||Number($('bs-quick-percent').value)<100){$('bs-quick-percent').value='100';bsQuickProgress('percent')}
+ }else if(val==='Currently Reading'&&!$('bs-quick-started').value)$('bs-quick-started').value=new Date().toLocaleDateString('sv-SE');
+}
+function bsQuickRating(value){
+ const n=Math.max(0,Math.min(5,Number(value)||0));$('bs-quick-rating').value=String(n);
+ document.querySelectorAll('#bs-quick-stars button').forEach((btn,i)=>{btn.classList.toggle('selected',i<n);btn.setAttribute('aria-pressed',String(i<n))});
+ $('bs-quick-rating-label').textContent=n?n+' / 5':'Not rated yet';
+}
+function bsQuickProgress(source){
+ const page=$('bs-quick-page'),total=$('bs-quick-total'),percent=$('bs-quick-percent');
+ const maxPages=Number(total.value)||0;
+ if(source==='page'){
+  if(maxPages>0)percent.value=String(Math.max(0,Math.min(100,Math.round(100*(Number(page.value)||0)/maxPages))));
+ }else if(source==='percent'){
+  const p=Math.max(0,Math.min(100,Math.round(Number(percent.value)||0)));percent.value=String(p);
+  if(maxPages>0)page.value=String(Math.round(maxPages*p/100));
+ }else if(source==='total'&&maxPages>0){
+  if(page.value!=='')percent.value=String(Math.max(0,Math.min(100,Math.round(100*(Number(page.value)||0)/maxPages))));
+  else if(percent.value!=='')page.value=String(Math.round(maxPages*(Number(percent.value)||0)/100));
+ }
+ const p=Math.max(0,Math.min(100,Number(percent.value)||0));
+ $('bs-quick-progress-fill').style.width=p+'%';
+ $('bs-quick-progress-fill').parentElement.setAttribute('aria-valuenow',String(p));
+ $('bs-quick-progress-hint').textContent=maxPages>0?'Progress: '+p+'% · '+(page.value||0)+' of '+maxPages+' pages.':'Progress: '+p+'%. Add total pages to calculate the current page automatically.';
+}
+function bsQuickSave(event,id){
+ event.preventDefault();
+ const b=books.find(x=>x.id===id),form=$('bs-quick-book-form');if(!b||!form)return;
+ const status=$('bs-quick-status').value;
+ const total=Math.round(Number($('bs-quick-total').value)||0);
+ const pageInput=$('bs-quick-page').value;
+ const page=pageInput===''?0:Math.round(Number(pageInput));
+ const percent=Math.round(Number($('bs-quick-percent').value)||0);
+ const rating=Number($('bs-quick-rating').value)||0;
+ if(!Number.isFinite(total)||total<0||total>100000||!Number.isFinite(page)||page<0||page>100000||total>0&&page>total||percent<0||percent>100){
+  $('bs-quick-save-state').textContent='Please check your page numbers and progress (0–100%).';return;
+ }
+ const started=$('bs-quick-started').value,finished=$('bs-quick-finished').value;
+ if(started&&finished&&finished<started){$('bs-quick-save-state').textContent='Finish date cannot be before start date.';return}
+ const revised={...b,status,pages:total,currentPage:page,progressPercent:percent,rating,started,finished,notes:$('bs-quick-notes').value};
+ books=books.map(x=>x.id===id?revised:x);
+ store();
+ // Keep the detail modal visible while updating the library behind it.
+ const active=document.querySelector('[data-nav].active')?.dataset.nav||'library';
+ if(active==='library')renderLibrary();
+ else if(active==='stats'){renderStats();if(typeof bsRenderStatsPlus==='function')bsRenderStatsPlus();}
+ else if(active==='home')renderHome();
+ else if(active==='bookshelf')renderBookshelf();
+ else if(active==='wishlist')renderWishlist();
+ else if(active==='profile'&&typeof bsProfileRender==='function')bsProfileRender();
+ $('bs-quick-save-state').textContent='✓ Saved locally. Your account will sync shortly.';
+ toast('Reading updates saved ♡');
+}
 function removeBook(id){if(!confirm('Delete this book from your library?'))return;books=books.filter(x=>x.id!==id);store();closeModal();go(document.querySelector('[data-nav].active')?.dataset.nav||'library');toast('Book deleted')}
 function showModal(){$('dialog').classList.remove('hidden');document.body.style.overflow='hidden'}function closeModal(){$('dialog').classList.add('hidden');document.body.style.overflow=''}document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 function exportData(){let data={version:1,exportedAt:new Date().toISOString(),goal:getGoal(),books:booksForCloud(),journal};let url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));let a=document.createElement('a');a.href=url;a.download='blue-shelf-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
