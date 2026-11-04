@@ -293,16 +293,20 @@ function cleanDescription(value){
 let lastSavedAt=null;
 function updateSaveState(message,error=false){const node=document.getElementById('saveState');if(!node)return;node.textContent=message;node.classList.toggle('error',error);}
 function store(){
- try{
-  localStorage.setItem(KEY,JSON.stringify(books));
-  lastSavedAt=new Date();if(typeof scheduleCloudSave==='function')scheduleCloudSave();
-  updateSaveState('✓ Auto-saved '+lastSavedAt.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
-  return true;
- }catch(err){
-  updateSaveState('Not saved — export backup!',true);
-  console.warn('Blue Shelf save failed',err);
-  return false;
- }
+ const copied=books;
+ try{localStorage.setItem(KEY,JSON.stringify(books))}
+ catch(err){console.warn('localStorage quota exceeded; IndexedDB save will be used',err)}
+ bsDurableWrite(copied).then(()=>{
+  lastSavedAt=new Date();
+  updateSaveState('✓ Saved securely on this device at '+lastSavedAt.toLocaleTimeString());
+  bsDurableBanner(books.length+' books saved in IndexedDB. Cloud sync remains paused.');
+ }).catch(err=>{
+  console.error('Blue Shelf save failed',err);
+  updateSaveState('⚠️ SAVE FAILED — EXPORT BACKUP',true);
+  bsDurableBanner('⚠️ Save failed. Export an emergency backup before leaving the page.');
+  alert('⚠️ Could not save book changes to this device. Export a backup before refreshing. '+(err.message||''));
+ });
+ return true;
 }
 function saveLibraryNow(){
  // File-backed HTML cannot overwrite itself from the browser. Persist changes locally and download a portable backup.
@@ -414,43 +418,117 @@ function detail(id){let b=books.find(x=>x.id===id);if(!b)return;$('modalTitle').
 function removeBook(id){if(!confirm('Delete this book from your library?'))return;books=books.filter(x=>x.id!==id);store();closeModal();go(document.querySelector('[data-nav].active')?.dataset.nav||'library');toast('Book deleted')}
 function showModal(){$('dialog').classList.remove('hidden');document.body.style.overflow='hidden'}function closeModal(){$('dialog').classList.add('hidden');document.body.style.overflow=''}document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 function exportData(){let data={version:1,exportedAt:new Date().toISOString(),goal:getGoal(),books:booksForCloud(),journal};let url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));let a=document.createElement('a');a.href=url;a.download='blue-shelf-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
+
+/* Large Blue Shelf collections: IndexedDB catalog, independent of the small localStorage quota.
+   The same browser can keep the complete catalog without publishing private books to GitHub. */
+let bsDurableQueue=Promise.resolve();
+function bsDurableOpen(){
+ return new Promise((resolve,reject)=>{
+  if(!('indexedDB' in window)){reject(new Error('This browser does not support IndexedDB'));return}
+  const req=indexedDB.open('blue-shelf-large-library-v1',1);
+  req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('catalog'))req.result.createObjectStore('catalog')};
+  req.onsuccess=()=>resolve(req.result);
+  req.onerror=()=>reject(req.error||new Error('Database unavailable'));
+  req.onblocked=()=>reject(new Error('Another tab is blocking the database'));
+ });
+}
+async function bsDurableRead(){
+ const db=await bsDurableOpen();
+ try{
+  return await new Promise((resolve,reject)=>{
+   const tx=db.transaction('catalog','readonly');
+   const req=tx.objectStore('catalog').get('current');
+   req.onsuccess=()=>resolve(req.result);
+   req.onerror=()=>reject(req.error||new Error('Could not read collection'));
+  });
+ }finally{db.close()}
+}
+function bsDurableWrite(list){
+ const snapshot=structuredClone(list);
+ const task=()=>bsDurableOpen().then(db=>new Promise((resolve,reject)=>{
+  const tx=db.transaction('catalog','readwrite');
+  tx.objectStore('catalog').put({books:snapshot,savedAt:new Date().toISOString()},'current');
+  tx.oncomplete=()=>{db.close();resolve(true)};
+  tx.onerror=()=>{const err=tx.error;db.close();reject(err||new Error('Disk storage failed'))};
+  tx.onabort=()=>{const err=tx.error;db.close();reject(err||new Error('Disk storage aborted'))};
+ }));
+ const written=bsDurableQueue.then(task,task);
+ bsDurableQueue=written.catch(()=>{});
+ return written;
+}
+let bsDurableInitialization=Promise.resolve();
+function bsDurableBanner(message){
+ const node=document.getElementById('bs-recovery-count');
+ if(node)node.textContent=message;
+}
+async function bsDurableBoot(){
+ try{
+  const row=await bsDurableRead();
+  if(Array.isArray(row?.books)&&row.books.length>books.length){
+   books=row.books;
+   bsDurableBanner('Recovered '+books.length+' books from IndexedDB. Cloud sync is paused; export a backup now.');
+   go(document.querySelector('[data-nav].active')?.dataset.nav||'library');
+   return;
+  }
+  if(!row?.books){await bsDurableWrite(books);}
+  bsDurableBanner(books.length+' books safely available on this device. Cloud sync is paused.');
+ }catch(e){
+  bsDurableBanner('⚠️ IndexedDB could not be opened. Export a backup before importing: '+e.message);
+  console.warn('Blue Shelf IndexedDB',e);
+ }
+}
 async function importData(event){
-  const file=event.target.files?.[0]; if(!file)return;
-  try {
-    const data=JSON.parse(await file.text());
-    if(!Array.isArray(data.books)||data.books.length>20000)throw new Error('Invalid book list');
-    if(data.journal&&typeof data.journal==='object'&&!Array.isArray(data.journal)){journal={...journal,...data.journal};persistJournal()}
-    const incoming=data.books.filter(b=>b&&typeof b.title==='string'&&typeof b.id==='string').map(b=>({
-      id:b.id,title:b.title.slice(0,180),author:String(b.author||'').slice(0,140),genre:String(b.genre||'').slice(0,80),
-      status:['Read','Currently Reading','To Be Read','DNF'].includes(b.status)?b.status:'To Be Read',
-      rating:Math.min(5,Math.max(0,Number(b.rating)||0)),pages:Math.max(0,Number(b.pages)||0),
-      finished:String(b.finished||''),series:String(b.series||''),cover:String(b.cover||''),
-      notes:String(b.notes||''),publisher:String(b.publisher||''),published:String(b.published||''),isbn:String(b.isbn||''),language:String(b.language||''),description:String(b.description||''),metadataSource:String(b.metadataSource||''),pagesApproximate:!!b.pagesApproximate,pagesSource:String(b.pagesSource||''),wishlist:!!b.wishlist,added:Number(b.added)||Date.now()
-    }));
-    if(!incoming.length)throw new Error('No valid books');
-    const normal=s=>String(s||'').normalize('NFKD').toLowerCase().replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'');
-    const key=b=>normal(b.title)+'|'+normal(b.author);
-    const existingIds=new Set(books.map(b=>b.id));
-    const existingKeys=new Set(books.map(key));
-    const additions=incoming.filter(b=>!existingIds.has(b.id)&&!existingKeys.has(key(b)));
-    const existingById=new Map(books.map(b=>[b.id,b]));
-    const existingByKey=new Map(books.map(b=>[key(b),b]));
-    if(!confirm('Import backup: add '+additions.length+' new books and restore missing metadata from '+(incoming.length-additions.length)+' existing books? Existing nonempty values will be kept.'))return;
-    let recovered=0;
-    for(const b of incoming){
-      const match=existingById.get(b.id)||existingByKey.get(key(b));
-      if(!match)continue;
-      for(const field of ['pages','publisher','published','isbn','language','description','genre','series','finished','rating','pagesSource','metadataSource']){
-        if((!match[field]||match[field]===0) && b[field]){match[field]=b[field];recovered++;}
-      }
-      if(!match.cover&&b.cover){match.cover=b.cover;recovered++;}
-      if(match.status==='To Be Read'&&b.status!=='To Be Read'){match.status=b.status;recovered++;}
-      if(!match.notes&&b.notes){match.notes=b.notes;recovered++;}
-      if(!match.wishlist&&b.wishlist){match.wishlist=true;recovered++;}
-      if(b.pagesApproximate&&match.pages===b.pages)match.pagesApproximate=true;
+ const file=event.target.files?.[0];if(!file)return false;
+ try{
+  await bsDurableInitialization;
+  const data=JSON.parse(await file.text());
+  if(!Array.isArray(data.books)||data.books.length>20000)throw new Error('Invalid book list');
+  const incoming=data.books.filter(b=>b&&typeof b.title==='string'&&typeof b.id==='string').map(b=>({
+   id:b.id,title:b.title.slice(0,180),author:String(b.author||'').slice(0,140),genre:String(b.genre||'').slice(0,80),
+   status:['Read','Currently Reading','To Be Read','DNF'].includes(b.status)?b.status:'To Be Read',
+   rating:Math.min(5,Math.max(0,Number(b.rating)||0)),pages:Math.max(0,Number(b.pages)||0),
+   finished:String(b.finished||''),series:String(b.series||''),cover:String(b.cover||''),
+   notes:String(b.notes||''),publisher:String(b.publisher||''),published:String(b.published||''),isbn:String(b.isbn||''),language:String(b.language||''),description:String(b.description||''),metadataSource:String(b.metadataSource||''),pagesApproximate:!!b.pagesApproximate,pagesSource:String(b.pagesSource||''),wishlist:!!b.wishlist,added:Number(b.added)||Date.now()
+  }));
+  if(!incoming.length)throw new Error('No valid books in the file');
+  const normal=x=>String(x||'').normalize('NFKD').toLowerCase().replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'');
+  const key=b=>normal(b.title)+'|'+normal(b.author);
+  const nextBooks=books.map(b=>({...b}));
+  const existingById=new Map(nextBooks.map(b=>[b.id,b]));
+  const existingByKey=new Map(nextBooks.map(b=>[key(b),b]));
+  let additions=0,recovered=0;
+  for(const b of incoming){
+   const match=existingById.get(b.id)||existingByKey.get(key(b));
+   if(match){
+    for(const field of ['pages','publisher','published','isbn','language','description','genre','series','finished','rating','pagesSource','metadataSource']){
+     if((!match[field]||match[field]===0)&&b[field]){match[field]=b[field];recovered++;}
     }
-    books=[...books,...additions];store();go('library');toast(additions.length+' books added, '+recovered+' missing values restored!');return true;
-  }catch(e){alert('Could not import this file. Please select a valid Blue Shelf JSON backup.')}finally{event.target.value=''}
+    if(!match.cover&&b.cover){match.cover=b.cover;recovered++}
+    if(match.status==='To Be Read'&&b.status!=='To Be Read'){match.status=b.status;recovered++}
+    if(!match.notes&&b.notes){match.notes=b.notes;recovered++}
+    if(!match.wishlist&&b.wishlist){match.wishlist=true;recovered++}
+    if(b.pagesApproximate&&match.pages===b.pages)match.pagesApproximate=true;
+   }else{
+    nextBooks.push(b);existingById.set(b.id,b);existingByKey.set(key(b),b);additions++;
+   }
+  }
+  if(!confirm('Add '+additions+' new books and fill '+recovered+' missing values? Your current books and reading notes will stay.'))return false;
+  // Commit to IndexedDB first; the visible library is not changed if durable persistence fails.
+  await bsDurableWrite(nextBooks);
+  const verified=await bsDurableRead();
+  if(!Array.isArray(verified?.books)||verified.books.length!==nextBooks.length)throw new Error('Could not verify saved collection');
+  books=nextBooks;
+  try{localStorage.setItem(KEY,JSON.stringify(books))}catch(e){console.warn('Full collection is too large for localStorage. IndexedDB contains the saved copy.',e)}
+  if(data.journal&&typeof data.journal==='object'&&!Array.isArray(data.journal)){journal={...journal,...data.journal};persistJournal()}
+  if(typeof scheduleCloudSave==='function')scheduleCloudSave();
+  go('library');toast('✓ '+additions+' new books safely saved. Total: '+books.length);
+  bsDurableBanner('✓ '+books.length+' books saved and verified in IndexedDB. Cloud sync remains paused.');
+  return true;
+ }catch(e){
+  console.warn('Blue Shelf import',e);
+  alert('Import not saved. Existing books were kept. '+(e.message||'Please check available storage.'));
+  return false;
+ }finally{event.target.value=''}
 }
 // Add this catalog once, without replacing any books already saved in this browser.
 try {
@@ -1334,6 +1412,7 @@ openReader=async function(id){
 };
 
 bsLoadSort();
+bsDurableInitialization=bsDurableBoot();
 
 /* bs-emergency-recovery-pause: prevent destructive replacement of larger local libraries. */
 (function(){
