@@ -724,6 +724,7 @@ function detail(id){
  ${b.description?`<div class="section"><b>About this book</b><p style="white-space:pre-wrap;line-height:1.7">${esc(cleanDescription(b.description))}</p></div>`:''}
  <div class="actions"><button class="secondary" onclick="closeModal()">Close</button><button class="secondary" onclick="openForm('${esc(b.id)}');fillFromOnline()">Find more details ✦</button><button class="secondary" onclick="openForm('${esc(b.id)}')">Edit all details</button></div>`;
  showModal();
+ bsDetailReadingButton(id);
 }
 function bsQuickStatus(btn){
  const val=btn.textContent.trim();
@@ -1181,6 +1182,23 @@ function pickXml(xml,localName){return [...xml.getElementsByTagName('*')].find(n
 function allXml(xml,localName){return [...xml.getElementsByTagName('*')].filter(n=>n.localName===localName)}
 async function compressImage(blob){try{const img=await createImageBitmap(blob);const cvs=document.createElement('canvas');const scale=Math.min(180/img.width,270/img.height,1);cvs.width=Math.max(1,Math.round(img.width*scale));cvs.height=Math.max(1,Math.round(img.height*scale));cvs.getContext('2d').drawImage(img,0,0,cvs.width,cvs.height);img.close();return cvs.toDataURL('image/webp',.72)}catch{return ''}}
 async function getEpubInfo(file){await loadExternalScript(JSZIP_URL,'JSZip');let zip=await window.JSZip.loadAsync(file);let container=await zip.file('META-INF/container.xml')?.async('string');if(!container)throw new Error('Missing EPUB manifest');let xml=new DOMParser().parseFromString(container,'application/xml');const path=allXml(xml,'rootfile')[0]?.getAttribute('full-path');if(!path)throw new Error('Missing OPF');const opf=new DOMParser().parseFromString(await zip.file(path).async('string'),'application/xml');const get=n=>allXml(opf,n)[0]?.textContent?.trim()||'';const title=get('title')||file.name.replace(/\.epub$/i,''),author=get('creator');let coverId=allXml(opf,'meta').find(n=>n.getAttribute('name')==='cover')?.getAttribute('content');let coverNode=allXml(opf,'item').find(n=>n.getAttribute('id')===coverId||n.getAttribute('properties')?.includes('cover-image'))||allXml(opf,'item').find(n=>(n.getAttribute('href')||'').toLowerCase().includes('cover')&&/image\//.test(n.getAttribute('media-type')||''));let cover='';if(coverNode){const href=coverNode.getAttribute('href');const root=path.includes('/')?path.substring(0,path.lastIndexOf('/')+1):'';const parts=[];for(const p of (root+href).split('/')){if(p==='..')parts.pop();else if(p&&p!=='.')parts.push(p)}const entry=zip.file(parts.join('/'));if(entry){const imgBlob=new Blob([await entry.async('blob')],{type:coverNode.getAttribute('media-type')||'image/jpeg'});cover=await compressImage(imgBlob)}}return {title,author,publisher:get('publisher'),published:get('date'),isbn:get('identifier'),description:get('description'),cover};}
+async function bsDetailReadingButton(id){
+ try{
+  const rec=await dbGetFile(id);
+  if(!rec||!rec.blob)return;
+  // Do not insert a button into a different book's modal after an async read.
+  if($('dialog')?.classList.contains('hidden')||!books.some(b=>b.id===id))return;
+  const actions=$('modalBody')?.querySelector('.actions:last-child');
+  if(!actions||actions.querySelector('.bs-detail-read'))return;
+  const b=books.find(x=>x.id===id);
+  if(!$('modalBody')?.querySelector('h3')?.textContent?.includes(b.title))return;
+  const button=document.createElement('button');button.type='button';
+  button.className='primary bs-detail-read';
+  button.textContent='📖 Read this book';
+  button.onclick=()=>{closeModal();openReader(id)};
+  actions.prepend(button);
+ }catch(e){console.warn('Could not check local reading copy',e)}
+}
 /* File-first importer: an EPUB remains readable even when some OPF metadata is missing.
    Ebook contents never enter the book records or the cloud. */
 let bsEbookImportBusy=false;
