@@ -2161,8 +2161,8 @@ openReader=async function(id){
 /* Reader v2: independent of EPUB metadata parsing and resilient to stale locations. */
 let bsReaderOpening=0;
 openReader=async function(id){
- const version=++bsReaderOpening;
  closeReader();
+ const version=++bsReaderOpening;
  readerId=id;
  $('readerTitle').textContent='Opening book…';
  $('readerToc').innerHTML='<option value="">Chapters</option>';
