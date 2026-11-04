@@ -280,7 +280,16 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
 .bs-bingo-hub .bs-bingo-grid.bs-bingo-monthly{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
 @media(max-width:480px){.bs-bingo-hub .bs-bingo-grid.bs-bingo-monthly .bs-bingo-square{min-height:106px;font-size:10px;padding:8px 4px}.bs-bingo-hub .bs-bingo-grid.bs-bingo-monthly{gap:5px}}
-</style><style id="bs-bingo-month-theme-styles">.bs-bingo-theme-note{display:inline-block;margin:4px 0 3px;padding:9px 14px;background:linear-gradient(100deg,#e6f3fa,#f9e7f0);border:1px solid #e5ebf2;border-radius:99px;font-size:12px;font-weight:700;color:#60859d}.bs-bingo-hub .bs-bingo-grid.bs-bingo-monthly .bs-bingo-square:nth-child(-n+8){border-color:#c6dfe5;background:linear-gradient(150deg,#e9f5f5,#fff4f8)}</style></head>
+</style><style id="bs-bingo-month-theme-styles">.bs-bingo-theme-note{display:inline-block;margin:4px 0 3px;padding:9px 14px;background:linear-gradient(100deg,#e6f3fa,#f9e7f0);border:1px solid #e5ebf2;border-radius:99px;font-size:12px;font-weight:700;color:#60859d}.bs-bingo-hub .bs-bingo-grid.bs-bingo-monthly .bs-bingo-square:nth-child(-n+8){border-color:#c6dfe5;background:linear-gradient(150deg,#e9f5f5,#fff4f8)}</style><style id="bs-reader-reliable-v2">
+#readerView{position:relative;min-height:0}
+#epubReadingArea{width:100%;height:100%;min-height:0;background:#fffdf8}
+.bs-reader-loading,.bs-reader-error{max-width:440px;margin:7vh auto;padding:28px;text-align:center;color:#6b8da4;line-height:1.7}
+.bs-reader-error{border:1px solid #e7eaf0;border-radius:20px;background:linear-gradient(125deg,#edf7fc,#fff5f9)}
+.bs-reader-error h3{font:600 23px 'Playfair Display',Georgia,serif;color:#4e7290}
+.bs-reader-error button{padding:10px 17px;border:1px solid #d5e7ef;border-radius:12px;background:white;color:#587b95;cursor:pointer}
+#myLocalFiles .local-file{gap:14px}#myLocalFiles .local-file span{min-width:0;overflow-wrap:anywhere}
+#myLocalFiles .local-file button{flex:none;border-radius:11px;background:#e5f2fa;color:#4f7492;font-weight:700;padding:10px 14px}
+</style></head>
 <body>
 
 <div id="bs-auth-gate" role="region" aria-label="Blue Shelf sign in">
@@ -371,7 +380,7 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
 </section>
 <section id="page-files" class="hidden">
  <div class="sectiontitle"><div><div class="eyebrow">YOUR DIGITAL BOOKS</div><h2>Import & Read 📖</h2><p class="sub">Import several EPUB and PDF files at once. Their reading copies stay on this device.</p></div></div>
- <div class="two section"><div class="panel journal-panel"><h3>📂 Add your books</h3><p class="sub">EPUB title, author and cover are read automatically when available; PDF metadata may be limited. Files never get uploaded to a server.</p><input type="file" id="ebookFiles" accept=".epub,.pdf,application/epub+zip,application/pdf" multiple><div style="margin-top:14px"><button class="primary" onclick="importEbooks()">Import selected files</button></div><p id="fileProgress" class="sub" aria-live="polite"></p></div><div class="panel journal-panel"><h3>📖 Your on-device reader</h3><p class="sub">Click Read to open a stored EPUB or PDF. Your last EPUB location will be remembered in this browser.</p><div id="myLocalFiles"></div></div></div>
+ <div class="two section"><div class="panel journal-panel"><h3>📂 Add your books</h3><p class="sub">The full EPUB/PDF is saved first. Then Blue Shelf reads its title, author, cover and available publishing details. If metadata is missing, the book is still kept for reading. Original files stay on this device.</p><input type="file" id="ebookFiles" accept=".epub,.pdf,application/epub+zip,application/pdf" multiple><div style="margin-top:14px"><button id="bs-ebook-import-button" class="primary" onclick="importEbooks()">Save & import books ♡</button></div><p id="fileProgress" class="sub" aria-live="polite"></p></div><div class="panel journal-panel"><h3>📖 Your on-device reader</h3><p class="sub">Open any saved EPUB or PDF, turn pages, browse chapters and pick up where you stopped. Full ebook files stay on this device.</p><div id="myLocalFiles"></div></div></div>
 </section>
 <section id="page-cloud" class="hidden">
  <div class="sectiontitle"><div><div class="eyebrow">READ EVERYWHERE</div><h2>Cloud Sync ☁️</h2><p class="sub">Automatic two-way synchronization after sign-in. Book records and journal update across devices; ebook files stay local.</p></div></div>
@@ -1172,7 +1181,60 @@ function pickXml(xml,localName){return [...xml.getElementsByTagName('*')].find(n
 function allXml(xml,localName){return [...xml.getElementsByTagName('*')].filter(n=>n.localName===localName)}
 async function compressImage(blob){try{const img=await createImageBitmap(blob);const cvs=document.createElement('canvas');const scale=Math.min(180/img.width,270/img.height,1);cvs.width=Math.max(1,Math.round(img.width*scale));cvs.height=Math.max(1,Math.round(img.height*scale));cvs.getContext('2d').drawImage(img,0,0,cvs.width,cvs.height);img.close();return cvs.toDataURL('image/webp',.72)}catch{return ''}}
 async function getEpubInfo(file){await loadExternalScript(JSZIP_URL,'JSZip');let zip=await window.JSZip.loadAsync(file);let container=await zip.file('META-INF/container.xml')?.async('string');if(!container)throw new Error('Missing EPUB manifest');let xml=new DOMParser().parseFromString(container,'application/xml');const path=allXml(xml,'rootfile')[0]?.getAttribute('full-path');if(!path)throw new Error('Missing OPF');const opf=new DOMParser().parseFromString(await zip.file(path).async('string'),'application/xml');const get=n=>allXml(opf,n)[0]?.textContent?.trim()||'';const title=get('title')||file.name.replace(/\.epub$/i,''),author=get('creator');let coverId=allXml(opf,'meta').find(n=>n.getAttribute('name')==='cover')?.getAttribute('content');let coverNode=allXml(opf,'item').find(n=>n.getAttribute('id')===coverId||n.getAttribute('properties')?.includes('cover-image'))||allXml(opf,'item').find(n=>(n.getAttribute('href')||'').toLowerCase().includes('cover')&&/image\//.test(n.getAttribute('media-type')||''));let cover='';if(coverNode){const href=coverNode.getAttribute('href');const root=path.includes('/')?path.substring(0,path.lastIndexOf('/')+1):'';const parts=[];for(const p of (root+href).split('/')){if(p==='..')parts.pop();else if(p&&p!=='.')parts.push(p)}const entry=zip.file(parts.join('/'));if(entry){const imgBlob=new Blob([await entry.async('blob')],{type:coverNode.getAttribute('media-type')||'image/jpeg'});cover=await compressImage(imgBlob)}}return {title,author,publisher:get('publisher'),published:get('date'),isbn:get('identifier'),description:get('description'),cover};}
-async function importEbooks(){const selected=[...document.getElementById('ebookFiles').files];const progress=document.getElementById('fileProgress');if(!selected.length){progress.textContent='Select EPUB/PDF files first.';return}let count=0,errors=[];for(const file of selected){try{const epub=/\.epub$/i.test(file.name),pdf=/\.pdf$/i.test(file.name);if(!epub&&!pdf)continue;let meta=epub?await getEpubInfo(file):{title:file.name.replace(/\.pdf$/i,'').replace(/[_-]+/g,' ').trim(),author:'',cover:''};const key=s=>String(s||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();let old=books.find(b=>key(b.title)===key(meta.title)&&(!meta.author||key(b.author)===key(meta.author)));let id=old?.id||('ebook'+Date.now()+Math.random().toString(36).slice(2));await dbPutFile({id,name:file.name,type:epub?'epub':'pdf',blob:file,added:Date.now()});if(!old){books.push({id,added:Date.now(),title:meta.title,author:meta.author,cover:meta.cover,description:meta.description||'',publisher:meta.publisher||'',published:meta.published||'',isbn:meta.isbn||'',genre:'',status:'To Be Read',rating:0,pages:0,finished:'',notes:'',series:'',wishlist:false})}else{if(!old.cover&&meta.cover)old.cover=meta.cover;if(!old.author&&meta.author)old.author=meta.author}count++;progress.textContent=`Imported ${count}/${selected.length} files...`;}catch(e){errors.push(file.name+': '+e.message)}}store();renderLocalFiles();document.getElementById('ebookFiles').value='';progress.textContent=`✓ Imported ${count} files${errors.length?'. Could not import: '+errors.slice(0,4).join('; '):'. EPUB/PDF copies stay on this device.'}`;}
+/* File-first importer: an EPUB remains readable even when some OPF metadata is missing.
+   Ebook contents never enter the book records or the cloud. */
+let bsEbookImportBusy=false;
+async function importEbooks(){
+ const picker=$('ebookFiles'),progress=$('fileProgress'),button=$('bs-ebook-import-button');
+ const selected=[...(picker?.files||[])];
+ if(!selected.length){progress.textContent='Choose EPUB or PDF files first.';return}
+ if(bsEbookImportBusy)return;
+ bsEbookImportBusy=true;if(button)button.disabled=true;
+ let saved=0,metadataOK=0,metadataMissing=0,errors=[],changed=false;
+ try{
+  const existingFiles=await dbListFiles();
+  const byName=new Map(existingFiles.map(r=>[String(r.name||'').toLowerCase(),r]));
+  const normalize=v=>String(v||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  for(let i=0;i<selected.length;i++){
+   const file=selected[i],epub=/\.epub$/i.test(file.name),pdf=/\.pdf$/i.test(file.name);
+   if(!epub&&!pdf){errors.push(file.name+': unsupported file type');continue}
+   progress.textContent='Saving full reading copy '+(i+1)+' of '+selected.length+' — '+file.name;
+   try{
+    // Extracting metadata is optional. First preserve a complete original file in IndexedDB.
+    const known=byName.get(file.name.toLowerCase());
+    const id=known?.id||('ebook'+Date.now()+Math.random().toString(36).slice(2));
+    await dbPutFile({id,name:file.name,type:epub?'epub':'pdf',blob:file,added:known?.added||Date.now()});
+    byName.set(file.name.toLowerCase(),{id,name:file.name,added:known?.added||Date.now()});
+    saved++;
+    let meta={title:file.name.replace(/\.(epub|pdf)$/i,'').replace(/[_]+/g,' ').trim(),author:'',cover:''};
+    if(epub){
+     try{meta={...meta,...await getEpubInfo(file)};metadataOK++}
+     catch(err){metadataMissing++;console.warn('EPUB metadata not available; file remains readable:',file.name,err)}
+    }
+    let book=books.find(b=>b.id===id)||books.find(b=>normalize(b.title)===normalize(meta.title)&&(!meta.author||!b.author||normalize(b.author)===normalize(meta.author)));
+    if(!book){
+     book={id,added:Date.now(),title:meta.title||file.name,author:meta.author||'',cover:meta.cover||'',description:meta.description||'',publisher:meta.publisher||'',published:meta.published||'',isbn:meta.isbn||'',genre:'',status:'To Be Read',rating:0,pages:0,finished:'',notes:'',series:'',wishlist:false};
+     books.push(book);changed=true;
+    }else{
+     for(const field of ['cover','author','description','publisher','published','isbn'])if(!book[field]&&meta[field]){book[field]=meta[field];changed=true}
+    }
+    // Keep stable identifier for the reader even when a matched catalog book has another ID.
+    if(book.id!==id){
+     const rec=await dbGetFile(id);
+     await dbPutFile({...rec,id:book.id});
+     // The newly written original is intentionally kept until safely linked.
+     byName.set(file.name.toLowerCase(),{id:book.id,name:file.name,added:known?.added||Date.now()});
+    }
+    progress.textContent='✓ '+saved+' files preserved · extracting book information when available…';
+   }catch(err){errors.push(file.name+': '+(err.message||err))}
+  }
+  if(changed)store();
+  await renderLocalFiles();
+  if(saved===selected.length)picker.value='';
+  progress.textContent='✓ '+saved+' full reading '+(saved===1?'copy':'copies')+' saved on this device'+(metadataMissing?' · '+metadataMissing+' EPUB(s) kept without complete metadata':'')+(errors.length?' · Issues: '+errors.slice(0,3).join('; '):'')+'. Open any saved book with Read →.';
+ }catch(err){progress.textContent='⚠ Import interrupted: '+(err.message||err)+'. Already saved files remain available.'}
+ finally{bsEbookImportBusy=false;if(button)button.disabled=false}
+}
 async function renderLocalFiles(){const node=document.getElementById('myLocalFiles');if(!node)return;node.replaceChildren();try{const files=await dbListFiles();files.sort((a,b)=>b.added-a.added);for(const f of files){let div=document.createElement('div');div.className='local-file';let title=document.createElement('span');title.textContent='📖 '+f.name.slice(0,55);let btn=document.createElement('button');btn.textContent='Read →';btn.onclick=()=>openReader(f.id);div.append(title,btn);node.append(div)}if(!files.length)node.textContent='No reading files imported on this device.'}catch(e){node.textContent='Local file storage unavailable in this browser: '+e.message}}
 let readerInstance=null,readerRendition=null,readerObjectUrl=null,readerId=null;
 async function openReader(id){try{const rec=await dbGetFile(id);if(!rec)throw new Error('File not found on this device');readerId=id;document.getElementById('readerTitle').textContent=rec.name;const view=document.getElementById('readerView');view.replaceChildren();document.getElementById('readerDialog').classList.remove('hidden');if(rec.type==='pdf'){readerObjectUrl=URL.createObjectURL(rec.blob);const frame=document.createElement('iframe');frame.src=readerObjectUrl;frame.title=rec.name;view.append(frame)}else{await loadExternalScript(EPUB_URL,'ePub');const data=await rec.blob.arrayBuffer();readerInstance=window.ePub(data);const div=document.createElement('div');div.id='epubReadingArea';view.append(div);readerRendition=readerInstance.renderTo('epubReadingArea',{width:'100%',height:'100%',flow:'paginated'});let saved={};try{saved=JSON.parse(localStorage.getItem(READER_KEY)||'{}')}catch{};await readerRendition.display(saved[id]||undefined);readerRendition.on('relocated',loc=>{if(!loc?.start?.cfi)return;let v={};try{v=JSON.parse(localStorage.getItem(READER_KEY)||'{}')}catch{};v[id]=loc.start.cfi;localStorage.setItem(READER_KEY,JSON.stringify(v))})}}catch(e){alert('Could not open reader: '+e.message);closeReader()}}
@@ -2096,6 +2158,84 @@ openReader=async function(id){
  bsReaderRenderHighlights();
 };
 
+/* Reader v2: independent of EPUB metadata parsing and resilient to stale locations. */
+let bsReaderOpening=0;
+openReader=async function(id){
+ const version=++bsReaderOpening;
+ closeReader();
+ readerId=id;
+ $('readerTitle').textContent='Opening book…';
+ $('readerToc').innerHTML='<option value="">Chapters</option>';
+ $('bs-reader-highlights').hidden=true;
+ $('bs-reader-progress').textContent='Loading your complete ebook…';
+ $('readerDialog').classList.remove('hidden');
+ const view=$('readerView');view.replaceChildren();
+ const spinner=document.createElement('p');spinner.className='bs-reader-loading';spinner.textContent='📖 Opening your book…';view.append(spinner);
+ try{
+  const rec=await dbGetFile(id);
+  if(!rec||!(rec.blob instanceof Blob))throw Error('The reading file is not on this device. Please import the EPUB or PDF again.');
+  if(version!==bsReaderOpening)return;
+  $('readerTitle').textContent=rec.name;
+  if(rec.type==='pdf'){
+   readerObjectUrl=URL.createObjectURL(rec.blob);
+   const frame=document.createElement('iframe');frame.src=readerObjectUrl;frame.title=rec.name;view.replaceChildren(frame);
+   $('bs-reader-progress').textContent='PDF ready · reading copy saved on this device';
+   return;
+  }
+  await loadExternalScript(JSZIP_URL,'JSZip');
+  await loadExternalScript(EPUB_URL,'ePub');
+  if(version!==bsReaderOpening)return;
+  const data=await rec.blob.arrayBuffer();
+  readerInstance=window.ePub(data);
+  view.innerHTML='<div id="epubReadingArea"></div>';
+  readerRendition=readerInstance.renderTo('epubReadingArea',{width:'100%',height:'100%',flow:'paginated',spread:'none'});
+  // Attach navigation and persistence listeners before displaying the first page.
+  readerRendition.on('relocated',loc=>{
+   if(version!==bsReaderOpening||!loc?.start?.cfi)return;
+   try{const places=JSON.parse(localStorage.getItem(READER_KEY)||'{}');places[id]=loc.start.cfi;localStorage.setItem(READER_KEY,JSON.stringify(places))}catch(err){console.warn('Could not preserve reader position',err)}
+   bsReaderUpdateProgress(loc);
+  });
+  readerRendition.on('selected',bsReaderAddHighlight);
+  readerApplyStyles();$('readerTheme').value=readerSettings.theme||'light';
+  let saved='';
+  try{saved=JSON.parse(localStorage.getItem(READER_KEY)||'{}')[id]||''}catch{}
+  try{await readerRendition.display(saved||undefined)}
+  catch(err){
+   if(!saved)throw err;
+   console.warn('Saved reading location no longer works; returning to the beginning',err);
+   await readerRendition.display();
+  }
+  if(version!==bsReaderOpening)return;
+  bsReaderUpdateProgress(readerRendition.currentLocation?.());
+  readerEnhanceToc().catch(err=>console.warn('TOC unavailable',err));
+  const items=bsReaderNotes()[id]||[];
+  for(const item of items)try{readerRendition.annotations.highlight(item.cfi,{},null,'bs-passages')}catch{}
+  bsReaderRenderHighlights();
+ }catch(err){
+  if(version!==bsReaderOpening)return;
+  view.replaceChildren();
+  const panel=document.createElement('div');panel.className='bs-reader-error';
+  const h=document.createElement('h3');h.textContent='This book could not be opened';
+  const p=document.createElement('p');p.textContent=(err.message||String(err))+' You can try importing the original EPUB again; existing catalog data is safe.';
+  const button=document.createElement('button');button.type='button';button.textContent='Close reader';button.onclick=closeReader;
+  panel.append(h,p,button);view.append(panel);
+  $('bs-reader-progress').textContent='Reader could not load this file';
+ }
+};
+const bsOriginalReaderClose=closeReader;
+closeReader=function(){
+ bsReaderOpening++;
+ bsOriginalReaderClose();
+ readerId=null;
+};
+document.addEventListener('keydown',event=>{
+ if($('readerDialog')?.classList.contains('hidden'))return;
+ if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))return;
+ if(event.key==='ArrowLeft'||event.key==='ArrowRight'){
+  event.preventDefault();
+  if(event.key==='ArrowRight')readerNext();else readerPrev();
+ }else if(event.key==='Escape'){closeReader()}
+});
 bsLoadSort();
 bsDurableInitialization=bsDurableBoot();
 
