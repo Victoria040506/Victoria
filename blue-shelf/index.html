@@ -926,6 +926,10 @@ function bsCloudRestore(data){
  bsCloudApplying=true;
  try{
   const incoming=Array.isArray(data.books)?data.books.filter(b=>b&&typeof b.id==='string'):[];
+  if(incoming.length>0 && incoming.length<books.length){
+   bsCloudStatus('⚠️ Cloud has '+incoming.length+' books but this device has '+books.length+'. Keeping the larger local collection; no overwrite.');
+   return false;
+  }
   if(incoming.length===0 && books.length>0){
    bsCloudStatus('The cloud collection is empty; keeping your '+books.length+' local books. Upload manually only if you want to replace it.');
    return false;
@@ -1437,7 +1441,7 @@ bsDurableInitialization=bsDurableBoot();
  }
  window.bsExportEmergencyBackup=function(){
   try{
-   const raw=localStorage.getItem(KEY),arr=raw?JSON.parse(raw):books;
+   const arr=books;
    const data={version:2,recovery:true,exportedAt:new Date().toISOString(),books:Array.isArray(arr)?arr:books,journal,sessions:readingSessions,customShelves,challengeGoals,readerMarks,readerSettings,goal:getGoal()};
    const file=new Blob([JSON.stringify(data)],{type:'application/json'});
    const url=URL.createObjectURL(file);
