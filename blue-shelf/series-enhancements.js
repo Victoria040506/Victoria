@@ -368,12 +368,17 @@
     }
     return {total:candidates.length,successful,pending};
   }
+  let bsLocalChecked=0,bsLocalTotal=0;
   function seriesScanShow(message){
     const stats=seriesScanStats();
     if(bsSeriesStatusNode)bsSeriesStatusNode.textContent=message;
     if(bsSeriesProgress){
       const percent=stats.total?Math.floor(stats.successful/stats.total*100):100;
-      bsSeriesProgress.innerHTML='<div class="bs-series-scan-progress-head"><strong>Online records checked: '
+      const localPercent=bsLocalTotal?Math.floor(bsLocalChecked/bsLocalTotal*100):0;
+      bsSeriesProgress.innerHTML='<div class="bs-series-scan-progress-head"><strong>Local book analysis: '
+        +bsLocalChecked+' / '+bsLocalTotal+'</strong><span>'+localPercent+'%</span></div>'
+        +'<div class="bs-series-scan-progress-track"><span class="bs-local-progress-fill" style="width:'+localPercent+'%"></span></div>'
+        +'<div class="bs-series-scan-progress-head" style="margin-top:12px"><strong>Online records checked: '
         +stats.successful+' / '+stats.total+'</strong><span>'+percent+'%</span></div>'
         +'<div class="bs-series-scan-progress-track"><span style="width:'+percent+'%"></span></div>'
         +'<small>'+stats.pending+' temporarily unavailable · '
@@ -475,7 +480,7 @@
   if(seriesDiscoveryRoot&&seriesDiscoveryActions&&onlineScanButton){
     const version=document.createElement('div');
     version.className='bs-scan-version';
-    version.textContent='Series discovery v7 · local + online';
+    version.textContent='Series discovery v8 · separate local and online progress';
     seriesDiscoveryActions.prepend(version);
     const localButton=document.createElement('button');
     localButton.type='button';localButton.className='secondary bs-local-scan';
@@ -485,12 +490,16 @@
       try{
         const before=bsSeriesProposals.length;
         const missing=books.filter(b=>b?.title&&!String(b.series||'').trim());
+        bsLocalTotal=missing.length;
+        bsLocalChecked=0;
+        seriesScanShow('Analyzing '+missing.length+' books using saved book details…');
         let found=0;
         for(const b of missing){
           const result=verifiedSeriesProposal(b)||matchingLocalSeries(b)
             ||seriesDirectTitle(b)||bsSeriesExplicitTitle(b.title)
             ||seriesFromDescription(b);
           if(result&&bsSeriesAddProposal(result))found++;
+          bsLocalChecked++;
         }
         bsSeriesRenderProposals();
         seriesScanShow('Local analysis finished: '+missing.length+' books without a series field considered; '
@@ -523,10 +532,11 @@
     onlineScanButton.textContent='⌕ Check online for series';
     const originalShow=seriesScanShow;
     // The visible version label proves which script actually executed.
-    seriesScanShow('Version 7 loaded. Choose a full local analysis, or online search when available.');
+    bsLocalTotal=books.filter(b=>b?.title&&!String(b.series||'').trim()).length;
+    seriesScanShow('Version 8 loaded. Run the local scan to fill its progress bar. Online scanning is separately limited by the catalog.');
   }
   const css=document.createElement('style');
-  css.textContent='.bs-series-gap{margin:10px 0 12px;padding:10px 13px;border:1px solid #f3e1bd;background:#fffbf0;border-radius:12px;color:#84683d;font-size:12px;line-height:1.6}.bs-series-gap small{display:block;color:#938573;font-size:11px}.bs-series-gap span{color:#d7a65d}.bs-series-card-info h3{overflow-wrap:anywhere}.bs-scan-version{font-size:11px;letter-spacing:.04em;color:#7394a8;font-weight:700;padding:5px 0}.bs-local-scan{margin-right:8px}.bs-series-scan-progress{width:100%;margin:12px 0 0;font-size:12px;color:#6d91a8}.bs-series-scan-progress-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:7px}.bs-series-scan-progress-track{height:8px;background:#e7eef3;border-radius:99px;overflow:hidden}.bs-series-scan-progress-track span{display:block;height:100%;background:#8cafc8;border-radius:99px}.bs-series-scan-progress small{display:block;margin-top:7px}';
+  css.textContent='.bs-series-gap{margin:10px 0 12px;padding:10px 13px;border:1px solid #f3e1bd;background:#fffbf0;border-radius:12px;color:#84683d;font-size:12px;line-height:1.6}.bs-series-gap small{display:block;color:#938573;font-size:11px}.bs-series-gap span{color:#d7a65d}.bs-series-card-info h3{overflow-wrap:anywhere}.bs-scan-version{font-size:11px;letter-spacing:.04em;color:#7394a8;font-weight:700;padding:5px 0}.bs-local-scan{margin-right:8px}.bs-series-scan-progress{width:100%;margin:12px 0 0;font-size:12px;color:#6d91a8}.bs-series-scan-progress-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:7px}.bs-series-scan-progress-track{height:8px;background:#e7eef3;border-radius:99px;overflow:hidden}.bs-series-scan-progress-track span{display:block;height:100%;background:#8cafc8;border-radius:99px}.bs-series-scan-progress small{display:block;margin-top:7px}.bs-local-progress-fill{background:#a6cdb6!important}';
   document.head.appendChild(css);
 
 })();
