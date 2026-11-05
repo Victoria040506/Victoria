@@ -981,7 +981,7 @@ async function bsSeriesFetchSuggestion(book){
     const r=await fetch('https://openlibrary.org/books/'+key+'.json',{signal:AbortSignal.timeout(9000)});
     if(!r.ok)continue;
     const info=await r.json(),candidate=bsSeriesFromEdition(info);
-    if(!candidate||!candidate.name)return null;
+    if(!candidate||!candidate.name)continue;
     // The source explicitly calls it a series; no guess from title/author alone.
     return {...candidate,source:'Open Library edition',id:book.id,title:book.title};
    }catch(e){console.warn('Series edition lookup skipped',e)}
