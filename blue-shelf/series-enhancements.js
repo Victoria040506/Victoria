@@ -246,7 +246,40 @@
     }
     return result;
   };
-  let seriesScannedTotal=0;
+  // Cursor and retry state are separate from book metadata and stay on this device.
+  // A throttled first result no longer sends every click to the same 20 records.
+  const scanQueueKey='blue-shelf-series-queue-v4';
+  function readScanQueue(){
+    try{
+      const obj=JSON.parse(localStorage.getItem(scanQueueKey)||'{}');
+      return obj&&typeof obj==='object'?obj:{};
+    }catch(e){return {};}
+  }
+  const scanQueue=readScanQueue();
+  const scanFailed=scanQueue.failed&&typeof scanQueue.failed==='object'?scanQueue.failed:{};
+  let scanCursor=Number.isFinite(scanQueue.cursor)?scanQueue.cursor:0;
+  function persistScanQueue(){
+    try{localStorage.setItem(scanQueueKey,JSON.stringify({
+      cursor:scanCursor,failed:scanFailed
+    }));}catch(e){console.warn('Could not save series queue cursor',e);}
+  }
+  function scanCandidates(){
+    return books.filter(b=>b?.id&&b?.title&&!String(b.series||'').trim()
+      &&!bsSeriesExplicitTitle(b.title)&&!seriesDirectTitle(b));
+  }
+  function eligibleForScan(book){
+    const key=String(book.id);
+    const fingerprint=[book.title,book.author,book.isbn].join('|');
+    const cached=seriesScanCache[key];
+    if(cached?.fingerprint===fingerprint
+      &&Date.now()-cached.checkedAt<14*24*60*60*1000){
+      if(cached.proposal)bsSeriesAddProposal(cached.proposal);
+      return false;
+    }
+    const failure=scanFailed[key];
+    return !(failure?.fingerprint===fingerprint&&failure.retryAfter>Date.now());
+  }
+  const retryMinutes=30;
   bsSeriesScan=async function(){
     if(bsSeriesScanBusy)return;
     const btn=document.getElementById('bs-series-scan');
@@ -254,55 +287,71 @@
     if(!btn||!status)return;
     bsSeriesScanBusy=true;seriesScanStop=false;
     btn.textContent='■ Stop scanning';btn.disabled=false;
-    btn.onclick=()=>{seriesScanStop=true;status.textContent='Stopping after the current book…';};
-    let localAdded=0,remoteFound=0,failed=0,rateLimited=false,checked=0;
+    btn.onclick=()=>{seriesScanStop=true;status.textContent='Stopping after the current lookup…';};
+    let localAdded=0,remoteFound=0,failed=0,rateLimited=false,checked=0,attempted=0;
     try{
-      for(const p of bsSeriesLocalProposals())if(bsSeriesAddProposal(p))localAdded++;
-      const candidates=books.filter(b=>{
-        if(!b?.title||String(b.series||'').trim()||bsSeriesExplicitTitle(b.title)||seriesDirectTitle(b))return false;
-        const cache=seriesScanCache[String(b.id)];
-        const fresh=cache&&cache.fingerprint===[b.title,b.author,b.isbn].join('|')
-          &&Date.now()-cache.checkedAt<14*24*60*60*1000;
-        // Cached matches remain in the review list until approved, so never
-        // silently skip a positive suggestion after a refresh.
-        if(fresh&&cache.proposal)bsSeriesAddProposal(cache.proposal);
-        return !fresh;
-      }).slice(0,20);
+      for(const suggestion of bsSeriesLocalProposals())
+        if(bsSeriesAddProposal(suggestion))localAdded++;
+      const pool=scanCandidates();
+      // Rotate through the *whole* catalog in stable library order.
+      // Advance before network calls so even a first-request 429 cannot restart
+      // from the same position on the next click.
+      const start=pool.length?((scanCursor%pool.length)+pool.length)%pool.length:0;
+      const candidates=[];
+      for(let offset=0;offset<pool.length&&candidates.length<20;offset++){
+        const index=(start+offset)%pool.length;
+        if(eligibleForScan(pool[index]))candidates.push({book:pool[index],index});
+      }
       if(!candidates.length){
-        status.textContent='No unchecked books in this batch. Previously scanned books are remembered for 14 days.';
+        const pending=Object.values(scanFailed).filter(x=>x?.retryAfter>Date.now());
+        const waiting=pending.length?' '+pending.length+' failed lookups are temporarily paused.':'';
+        status.textContent='Nothing new to check right now.'+waiting+' Already checked books are cached for 14 days.';
         bsSeriesRenderProposals();return;
       }
-      for(const b of candidates){
+      scanCursor=(candidates[candidates.length-1].index+1)%pool.length;
+      persistScanQueue();
+      for(const {book:b} of candidates){
         if(seriesScanStop)break;
-        status.textContent='Scanning '+(++checked)+' of '+candidates.length+' · '+b.title+' · '+bsSeriesProposals.length+' suggestions';
+        attempted++;
+        status.textContent='Checking book '+attempted+' of '+candidates.length+
+          ': '+b.title+' · '+bsSeriesProposals.length+' suggestions';
+        const key=String(b.id);
+        const fingerprint=[b.title,b.author,b.isbn].join('|');
         try{
           const proposal=await bsSeriesFetchSuggestion(b);
+          checked++;
           if(proposal&&bsSeriesAddProposal(proposal))remoteFound++;
-          seriesScanCache[String(b.id)]={fingerprint:[b.title,b.author,b.isbn].join('|'),
-            checkedAt:Date.now(),proposal:proposal||null};
+          seriesScanCache[key]={fingerprint,checkedAt:Date.now(),proposal:proposal||null};
+          delete scanFailed[key];
           seriesScanPersist();
         }catch(e){
           failed++;
-          if(e.message==='RATE_LIMIT'){rateLimited=true;break;}
+          scanFailed[key]={fingerprint,retryAfter:Date.now()+retryMinutes*60*1000};
+          if(e?.message==='RATE_LIMIT'){rateLimited=true;}
+          // Do not hit a throttled catalog again in this click.
+          persistScanQueue();
+          if(rateLimited)break;
         }
+        persistScanQueue();
         bsSeriesRenderProposals();
       }
-      seriesScannedTotal+=checked;
-      const eligible=books.filter(b=>b?.title&&!String(b.series||'').trim()).length;
-      const cached=Object.keys(seriesScanCache).length;
-      status.textContent='✓ '+checked+' checked in this batch · '+(localAdded+remoteFound)+' new suggestions · '+cached+' saved checks for this browser. '
-        +(seriesScanStop?'Stopped. ':rateLimited?'Catalog rate limit reached; retry later. ':failed?failed+' failed; you can retry. ':'')
-        +'Review suggestions, then scan the next batch. '+eligible+' books without series metadata (including titles with clear volume numbers).';
+      const completed=Object.keys(seriesScanCache).filter(k=>
+        seriesScanCache[k]?.checkedAt&&Date.now()-seriesScanCache[k].checkedAt<14*24*60*60*1000).length;
+      status.textContent='Processed '+attempted+' requests · '+checked+' successfully checked · '
+        +(localAdded+remoteFound)+' new suggestions · '+completed+' results cached on this device. '
+        +(rateLimited?'Catalog rate limit: this book will be retried later, and the next scan starts further along the library. '
+          :failed?failed+' failed lookups postponed for '+retryMinutes+' minutes. ':'')
+        +(seriesScanStop?'Stopped. ':'')+'Review suggestions before saving.';
       bsSeriesRenderProposals();
     }finally{
-      seriesScanStop=false;bsSeriesScanBusy=false;btn.textContent='✧ Scan next 20 books';
-      btn.onclick=()=>bsSeriesScan();btn.disabled=false;
+      seriesScanStop=false;bsSeriesScanBusy=false;
+      btn.textContent='✧ Scan next books';btn.onclick=()=>bsSeriesScan();btn.disabled=false;
     }
   };
   const scanLabel=document.getElementById('bs-series-scan-status');
-  if(scanLabel)scanLabel.textContent='Scans 20 books per batch using title, author and ISBN. Already checked books are remembered on this device. Every match requires approval.';
+  if(scanLabel)scanLabel.textContent='Scans up to 20 new books per batch. Failed lookups are postponed, and the next batch continues elsewhere in your library.';
   const scanButton=document.getElementById('bs-series-scan');
-  if(scanButton)scanButton.textContent='✧ Scan next 20 books';
+  if(scanButton)scanButton.textContent='✧ Scan next books';
   const css=document.createElement('style');
   css.textContent='.bs-series-gap{margin:10px 0 12px;padding:10px 13px;border:1px solid #f3e1bd;background:#fffbf0;border-radius:12px;color:#84683d;font-size:12px;line-height:1.6}.bs-series-gap small{display:block;color:#938573;font-size:11px}.bs-series-gap span{color:#d7a65d}.bs-series-card-info h3{overflow-wrap:anywhere}';
   document.head.appendChild(css);
