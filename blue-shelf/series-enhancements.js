@@ -466,8 +466,67 @@
   const scanButton=document.getElementById('bs-series-scan');
   if(scanButton)scanButton.textContent='✧ Scan next books';
   seriesScanShow('Ready to scan. Local series are detected instantly; the online catalog may temporarily limit requests.');
+
+  // Visible v7 diagnostics and full local scan, independent of catalog limits.
+  // Only suggestions are collected; no saved book is modified.
+  const seriesDiscoveryRoot=document.querySelector('.bs-series-discovery');
+  const seriesDiscoveryActions=document.querySelector('.bs-series-discover-actions');
+  const onlineScanButton=document.getElementById('bs-series-scan');
+  if(seriesDiscoveryRoot&&seriesDiscoveryActions&&onlineScanButton){
+    const version=document.createElement('div');
+    version.className='bs-scan-version';
+    version.textContent='Series discovery v7 · local + online';
+    seriesDiscoveryActions.prepend(version);
+    const localButton=document.createElement('button');
+    localButton.type='button';localButton.className='secondary bs-local-scan';
+    localButton.textContent='♡ Analyze my entire library locally';
+    localButton.onclick=()=>{
+      localButton.disabled=true;
+      try{
+        const before=bsSeriesProposals.length;
+        const missing=books.filter(b=>b?.title&&!String(b.series||'').trim());
+        let found=0;
+        for(const b of missing){
+          const result=verifiedSeriesProposal(b)||matchingLocalSeries(b)
+            ||seriesDirectTitle(b)||bsSeriesExplicitTitle(b.title)
+            ||seriesFromDescription(b);
+          if(result&&bsSeriesAddProposal(result))found++;
+        }
+        bsSeriesRenderProposals();
+        seriesScanShow('Local analysis finished: '+missing.length+' books without a series field considered; '
+          +found+' new suggestions. No internet requests were needed. '
+          +'Unrecognized books need more reliable external series metadata.');
+        if(!found&&before===bsSeriesProposals.length){
+          seriesScanShow('Local analysis finished: '+missing.length+' books checked, no new matches. '
+            +'This does not mean they are standalone books; their metadata is incomplete. '
+            +'Online lookup is a separate step and may be temporarily rate-limited.');
+        }
+      }catch(error){
+        console.error('Local series discovery',error);
+        seriesScanShow('Local discovery failed: '+(error?.message||'unknown error'));
+      }finally{localButton.disabled=false;}
+    };
+    onlineScanButton.parentNode.insertBefore(localButton,onlineScanButton);
+    // Ensure the original online button always gives a visible explanation
+    // when the remote catalog cooldown is still active.
+    const originalOnlineScan=bsSeriesScan;
+    bsSeriesScan=async function(){
+      if(Date.now()<remotePauseUntil){
+        const minutes=Math.max(1,Math.ceil((remotePauseUntil-Date.now())/60000));
+        seriesScanShow('Online catalog cooldown: approximately '+minutes+' min remaining. '
+          +'The remote search cannot run yet. You can use “Analyze my entire library locally” now.');
+        return;
+      }
+      return originalOnlineScan();
+    };
+    onlineScanButton.onclick=()=>bsSeriesScan();
+    onlineScanButton.textContent='⌕ Check online for series';
+    const originalShow=seriesScanShow;
+    // The visible version label proves which script actually executed.
+    seriesScanShow('Version 7 loaded. Choose a full local analysis, or online search when available.');
+  }
   const css=document.createElement('style');
-  css.textContent='.bs-series-gap{margin:10px 0 12px;padding:10px 13px;border:1px solid #f3e1bd;background:#fffbf0;border-radius:12px;color:#84683d;font-size:12px;line-height:1.6}.bs-series-gap small{display:block;color:#938573;font-size:11px}.bs-series-gap span{color:#d7a65d}.bs-series-card-info h3{overflow-wrap:anywhere}.bs-series-scan-progress{width:100%;margin:12px 0 0;font-size:12px;color:#6d91a8}.bs-series-scan-progress-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:7px}.bs-series-scan-progress-track{height:8px;background:#e7eef3;border-radius:99px;overflow:hidden}.bs-series-scan-progress-track span{display:block;height:100%;background:#8cafc8;border-radius:99px}.bs-series-scan-progress small{display:block;margin-top:7px}';
+  css.textContent='.bs-series-gap{margin:10px 0 12px;padding:10px 13px;border:1px solid #f3e1bd;background:#fffbf0;border-radius:12px;color:#84683d;font-size:12px;line-height:1.6}.bs-series-gap small{display:block;color:#938573;font-size:11px}.bs-series-gap span{color:#d7a65d}.bs-series-card-info h3{overflow-wrap:anywhere}.bs-scan-version{font-size:11px;letter-spacing:.04em;color:#7394a8;font-weight:700;padding:5px 0}.bs-local-scan{margin-right:8px}.bs-series-scan-progress{width:100%;margin:12px 0 0;font-size:12px;color:#6d91a8}.bs-series-scan-progress-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:7px}.bs-series-scan-progress-track{height:8px;background:#e7eef3;border-radius:99px;overflow:hidden}.bs-series-scan-progress-track span{display:block;height:100%;background:#8cafc8;border-radius:99px}.bs-series-scan-progress small{display:block;margin-top:7px}';
   document.head.appendChild(css);
 
 })();
