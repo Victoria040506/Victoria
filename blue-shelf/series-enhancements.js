@@ -9,7 +9,7 @@
   // The saved series field remains untouched.
   function cleanDisplayName(value){
     const name=String(value||'').trim();
-    const match=name.match(/^[^:：]{3,180}[:：]\\s*((?:(?:The|A|An)\\s+)?[^:：]{3,100}\\s+(?:Series|Duet|Trilogy|Saga|Quartet|Chronicles|Cycle))$/i);
+    const match=name.match(/^[^:：]{3,180}[:：]\s*((?:(?:The|A|An)\s+)?[^:：]{3,100}\s+(?:Series|Duet|Trilogy|Saga|Quartet|Chronicles|Cycle))$/i);
     return match?match[1].trim():name;
   }
   bsSeriesGroups=function(){
