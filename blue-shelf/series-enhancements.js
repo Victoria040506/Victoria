@@ -348,96 +348,126 @@
     remotePauseUntil=until;
     try{localStorage.setItem(seriesRemotePauseKey,String(until));}catch(e){}
   }
-  const seriesOfflineBatchSize=200;
+  // Scanner v6: count only actual catalog requests as catalog checks.
+  // Offline suggestions scan all books once per click; throttling never marks
+  // skipped books as checked or advances the cursor over them.
+  const bsSeriesProgress=document.createElement('div');
+  bsSeriesProgress.className='bs-series-scan-progress';
+  bsSeriesProgress.setAttribute('role','status');
+  bsSeriesProgress.setAttribute('aria-live','polite');
+  const bsSeriesStatusNode=document.getElementById('bs-series-scan-status');
+  if(bsSeriesStatusNode)bsSeriesStatusNode.insertAdjacentElement('afterend',bsSeriesProgress);
+  function seriesScanStats(){
+    const candidates=scanCandidates();
+    let successful=0,pending=0;
+    for(const book of candidates){
+      const f=[book.title,book.author,book.isbn].join('|');
+      const saved=seriesScanCache[String(book.id)];
+      if(saved?.fingerprint===f&&Date.now()-saved.checkedAt<14*86400000)successful++;
+      else if(scanFailed[String(book.id)]?.retryAfter>Date.now())pending++;
+    }
+    return {total:candidates.length,successful,pending};
+  }
+  function seriesScanShow(message){
+    const stats=seriesScanStats();
+    if(bsSeriesStatusNode)bsSeriesStatusNode.textContent=message;
+    if(bsSeriesProgress){
+      const percent=stats.total?Math.floor(stats.successful/stats.total*100):100;
+      bsSeriesProgress.innerHTML='<div class="bs-series-scan-progress-head"><strong>Online records checked: '
+        +stats.successful+' / '+stats.total+'</strong><span>'+percent+'%</span></div>'
+        +'<div class="bs-series-scan-progress-track"><span style="width:'+percent+'%"></span></div>'
+        +'<small>'+stats.pending+' temporarily unavailable · '
+        +bsSeriesProposals.length+' proposals waiting for review</small>';
+    }
+  }
   bsSeriesScan=async function(){
     if(bsSeriesScanBusy)return;
     const btn=document.getElementById('bs-series-scan');
-    const status=document.getElementById('bs-series-scan-status');
-    if(!btn||!status)return;
-    bsSeriesScanBusy=true;seriesScanStop=false;
+    if(!btn)return;
+    bsSeriesScanBusy=true;seriesScanStop=false;btn.disabled=false;
     btn.textContent='■ Stop scanning';
-    btn.disabled=false;
-    btn.onclick=()=>{seriesScanStop=true;status.textContent='Stopping safely…';};
-    let added=0,checked=0,failed=0,onlineAttempted=0;
+    btn.onclick=()=>{seriesScanStop=true;seriesScanShow('Stopping after the current request…');};
+    let localAdded=0,remoteAdded=0,checked=0,errors=0,rateLimited=false;
     try{
-      // Fast local scan across the complete library, including books that were
-      // previously skipped by online rate limits.
+      // The entire library can be scanned locally without the API.
       for(const p of bsSeriesLocalProposals()){
-        if(bsSeriesAddProposal(p))added++;
+        if(bsSeriesAddProposal(p))localAdded++;
+      }
+      bsSeriesRenderProposals();
+      seriesScanShow('Local scan complete: '+localAdded+' new proposals. Checking online catalog availability…');
+      if(Date.now()<remotePauseUntil){
+        const minutes=Math.max(1,Math.ceil((remotePauseUntil-Date.now())/60000));
+        seriesScanShow('Online search temporarily paused for about '+minutes
+          +' more minute'+(minutes===1?'':'s')+' due to catalog limits. '
+          +'No books will be skipped or counted as checked. Local suggestions are shown below.');
+        return;
       }
       const pool=scanCandidates();
       if(!pool.length){
-        status.textContent='All books with missing series were checked locally. No eligible online candidates.';
-        bsSeriesRenderProposals();return;
+        seriesScanShow('No unmatched books require an online lookup. Local suggestions are ready for review.');
+        return;
       }
       const start=((scanCursor%pool.length)+pool.length)%pool.length;
-      const indices=[];
-      for(let step=0;step<pool.length&&indices.length<20;step++){
-        const index=(start+step)%pool.length;
-        if(eligibleForScan(pool[index]))indices.push(index);
+      const queue=[];
+      for(let offset=0;offset<pool.length&&queue.length<10;offset++){
+        const index=(start+offset)%pool.length;
+        if(eligibleForScan(pool[index]))queue.push({book:pool[index],index});
       }
-      if(!indices.length){
-        status.textContent='No unreviewed books available now. Cached results remain available; failed requests can be retried later.';
-        bsSeriesRenderProposals();return;
+      if(!queue.length){
+        seriesScanShow('No eligible books to check right now. Previously checked books are cached; failed books become available after their retry period.');
+        return;
       }
-      // Never call the remote catalog more than 4 times per click. Each book
-      // may require one Google Books request; avoid Open Library's expensive
-      // edition-by-edition sequence during bulk discovery.
-      let onlineBudget=4;
-      for(const index of indices){
+      // Limit per-click network load. Never loop over untouched books merely
+      // to inflate a "processed" counter.
+      for(const {book,index} of queue){
         if(seriesScanStop)break;
-        const b=pool[index],key=String(b.id);
-        const fingerprint=[b.title,b.author,b.isbn].join('|');
-        const offline=verifiedSeriesProposal(b)||matchingLocalSeries(b)
-          ||seriesDirectTitle(b)||bsSeriesExplicitTitle(b.title)
-          ||seriesFromDescription(b);
-        scanCursor=(index+1)%pool.length;
-        persistScanQueue();
-        checked++;
-        if(offline){
-          if(bsSeriesAddProposal(offline))added++;
-          seriesScanCache[key]={fingerprint,checkedAt:Date.now(),proposal:offline};
+        const fingerprint=[book.title,book.author,book.isbn].join('|');
+        seriesScanShow('Searching online: '+(checked+errors+1)+' / '+queue.length+' · '+book.title);
+        try{
+          const result=await seriesLookupGoogleBooks(book);
+          if(result&&bsSeriesAddProposal(result))remoteAdded++;
+          seriesScanCache[String(book.id)]={fingerprint,checkedAt:Date.now(),proposal:result||null};
+          delete scanFailed[String(book.id)];
           seriesScanPersist();
-        }else if(onlineBudget>0&&Date.now()>=remotePauseUntil){
-          onlineBudget--;onlineAttempted++;
-          try{
-            const proposal=await seriesLookupGoogleBooks(b);
-            if(proposal&&bsSeriesAddProposal(proposal))added++;
-            seriesScanCache[key]={fingerprint,checkedAt:Date.now(),proposal:proposal||null};
-            delete scanFailed[key];
-            seriesScanPersist();
-          }catch(error){
-            failed++;
-            scanFailed[key]={fingerprint,retryAfter:Date.now()+30*60*1000};
-            if(error?.message==='RATE_LIMIT'||error?.message==='CATALOG_UNAVAILABLE'){
-              setRemotePause(Date.now()+30*60*1000);
-              onlineBudget=0;
-            }
+          checked++;
+        }catch(error){
+          errors++;
+          scanFailed[String(book.id)]={fingerprint,retryAfter:Date.now()+30*60000};
+          if(error?.message==='RATE_LIMIT'){
+            rateLimited=true;
+            setRemotePause(Date.now()+30*60000);
           }
         }
-        status.textContent='Processed '+checked+' / '+indices.length+' books in this batch · '
-          +added+' new suggestions · '+onlineAttempted+' online attempts'
-          +(Date.now()<remotePauseUntil?' · online catalog temporarily paused':'');
+        scanCursor=(index+1)%pool.length;
+        persistScanQueue();
+        bsSeriesRenderProposals();
+        if(rateLimited)break;
       }
-      bsSeriesRenderProposals();
-      const blocked=Date.now()<remotePauseUntil;
-      status.textContent='✓ Processed '+checked+' books · '+added+' new suggestions · '
-        +onlineAttempted+' online lookups'+(failed?' ('+failed+' unavailable)':'')+'. '
-        +(blocked?'Online catalog is temporarily limited; local analysis is still available. ':'')
-        +'Only confirmed or reviewable matches appear below. Continue to the next batch.';
+      const message=rateLimited
+        ?'The catalog blocked further requests after '+(checked+errors)+' attempt(s). '
+          +'Online scanning is paused for 30 minutes; unvisited books were not counted as checked.'
+        :'This run: '+checked+' books checked online, '+remoteAdded+' new online proposals'
+          +(errors?', '+errors+' temporarily unavailable':'')+'. '
+          +'You can continue with another batch or review suggestions.';
+      seriesScanShow(message);
+    }catch(error){
+      console.error('Series Tracker scan:',error);
+      seriesScanShow('The scan stopped because of an unexpected error: '+(error?.message||'unknown error')
+        +'. Your books were not changed.');
     }finally{
-      seriesScanStop=false;bsSeriesScanBusy=false;
-      btn.textContent='✧ Scan next books';
-      btn.onclick=()=>bsSeriesScan();
+      bsSeriesScanBusy=false;seriesScanStop=false;
       btn.disabled=false;
+      btn.textContent=Date.now()<remotePauseUntil?'✧ Check catalog availability':'✧ Scan next books';
+      btn.onclick=()=>bsSeriesScan();
     }
   };
   const scanLabel=document.getElementById('bs-series-scan-status');
   if(scanLabel)scanLabel.textContent='Checks 20 books per batch without stopping on one failed catalog request. Online sources are rate-limited; local matches work immediately.';
   const scanButton=document.getElementById('bs-series-scan');
   if(scanButton)scanButton.textContent='✧ Scan next books';
+  seriesScanShow('Ready to scan. Local series are detected instantly; the online catalog may temporarily limit requests.');
   const css=document.createElement('style');
-  css.textContent='.bs-series-gap{margin:10px 0 12px;padding:10px 13px;border:1px solid #f3e1bd;background:#fffbf0;border-radius:12px;color:#84683d;font-size:12px;line-height:1.6}.bs-series-gap small{display:block;color:#938573;font-size:11px}.bs-series-gap span{color:#d7a65d}.bs-series-card-info h3{overflow-wrap:anywhere}';
+  css.textContent='.bs-series-gap{margin:10px 0 12px;padding:10px 13px;border:1px solid #f3e1bd;background:#fffbf0;border-radius:12px;color:#84683d;font-size:12px;line-height:1.6}.bs-series-gap small{display:block;color:#938573;font-size:11px}.bs-series-gap span{color:#d7a65d}.bs-series-card-info h3{overflow-wrap:anywhere}.bs-series-scan-progress{width:100%;margin:12px 0 0;font-size:12px;color:#6d91a8}.bs-series-scan-progress-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:7px}.bs-series-scan-progress-track{height:8px;background:#e7eef3;border-radius:99px;overflow:hidden}.bs-series-scan-progress-track span{display:block;height:100%;background:#8cafc8;border-radius:99px}.bs-series-scan-progress small{display:block;margin-top:7px}';
   document.head.appendChild(css);
 
 })();
