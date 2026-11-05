@@ -282,7 +282,7 @@
     const result=oldLocalProposals(),seen=new Set(result.map(x=>x.id));
     for(const b of books){
       if(!b?.title||String(b.series||'').trim()||seen.has(b.id))continue;
-      const value=verifiedSeriesProposal(b)||matchingLocalSeries(b)||seriesDirectTitle(b);
+      const value=verifiedSeriesProposal(b)||matchingLocalSeries(b)||seriesDirectTitle(b)||seriesFromDescription(b);
       if(value){result.push(value);seen.add(b.id);}
     }
     return result;
@@ -321,77 +321,119 @@
     const failure=scanFailed[key];
     return !(failure?.fingerprint===fingerprint&&failure.retryAfter>Date.now());
   }
+  function seriesFromDescription(book){
+    const description=String(book.description||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+    if(!description||description.length<20)return null;
+    // Use only explicit statements: "Book 2 in the Royal Elite series" or
+    // "the third book in the ... series". Never guess from shared genre.
+    const direct=description.match(/\b(?:book|volume|tom|tome)\s*(\d{1,2})\s+(?:in|of|from|w|z)\s+(?:the\s+)?([A-ZÀ-Ž][\p{L}\p{N}'’&\s-]{2,70}?)\s+(?:series|duet|trilogy|saga|serii|cyklu)\b/iu);
+    const reverse=description.match(/\b(?:the\s+)?([A-ZÀ-Ž][\p{L}\p{N}'’&\s-]{2,70}?)\s+(?:series|duet|trilogy|saga|serii|cyklu)\s*(?:,|:|-)?\s*(?:book|tom|volume)\s*(\d{1,2})\b/iu);
+    let name,number;
+    if(direct){name=direct[2];number=Number(direct[1]);}
+    else if(reverse){name=reverse[1];number=Number(reverse[2]);}
+    else return null;
+    if(!name||name.trim().split(/\s+/).length>8||number>30)return null;
+    return seriesCandidate(book,name.trim(),'Explicit series statement in book description · verify',number);
+  }
   const retryMinutes=30;
+  // Batch discovery: move the cursor only for actual processed records.
+  // If an API throttles, continue with offline checks, but do not misreport
+  // unqueried books as checked. Next run resumes the precise next item.
+  const seriesRemotePauseKey='blue-shelf-series-remote-pause-v5';
+  function readRemotePause(){
+    try{return Number(localStorage.getItem(seriesRemotePauseKey))||0;}catch(e){return 0;}
+  }
+  let remotePauseUntil=readRemotePause();
+  function setRemotePause(until){
+    remotePauseUntil=until;
+    try{localStorage.setItem(seriesRemotePauseKey,String(until));}catch(e){}
+  }
+  const seriesOfflineBatchSize=200;
   bsSeriesScan=async function(){
     if(bsSeriesScanBusy)return;
     const btn=document.getElementById('bs-series-scan');
     const status=document.getElementById('bs-series-scan-status');
     if(!btn||!status)return;
     bsSeriesScanBusy=true;seriesScanStop=false;
-    btn.textContent='■ Stop scanning';btn.disabled=false;
-    btn.onclick=()=>{seriesScanStop=true;status.textContent='Stopping after the current lookup…';};
-    let localAdded=0,remoteFound=0,failed=0,rateLimited=false,checked=0,attempted=0;
+    btn.textContent='■ Stop scanning';
+    btn.disabled=false;
+    btn.onclick=()=>{seriesScanStop=true;status.textContent='Stopping safely…';};
+    let added=0,checked=0,failed=0,onlineAttempted=0;
     try{
-      for(const suggestion of bsSeriesLocalProposals())
-        if(bsSeriesAddProposal(suggestion))localAdded++;
-      const pool=scanCandidates();
-      // Rotate through the *whole* catalog in stable library order.
-      // Advance before network calls so even a first-request 429 cannot restart
-      // from the same position on the next click.
-      const start=pool.length?((scanCursor%pool.length)+pool.length)%pool.length:0;
-      const candidates=[];
-      for(let offset=0;offset<pool.length&&candidates.length<20;offset++){
-        const index=(start+offset)%pool.length;
-        if(eligibleForScan(pool[index]))candidates.push({book:pool[index],index});
+      // Fast local scan across the complete library, including books that were
+      // previously skipped by online rate limits.
+      for(const p of bsSeriesLocalProposals()){
+        if(bsSeriesAddProposal(p))added++;
       }
-      if(!candidates.length){
-        const pending=Object.values(scanFailed).filter(x=>x?.retryAfter>Date.now());
-        const waiting=pending.length?' '+pending.length+' failed lookups are temporarily paused.':'';
-        status.textContent='Nothing new to check right now.'+waiting+' Already checked books are cached for 14 days.';
+      const pool=scanCandidates();
+      if(!pool.length){
+        status.textContent='All books with missing series were checked locally. No eligible online candidates.';
         bsSeriesRenderProposals();return;
       }
-      scanCursor=(candidates[candidates.length-1].index+1)%pool.length;
-      persistScanQueue();
-      for(const {book:b} of candidates){
-        if(seriesScanStop)break;
-        attempted++;
-        status.textContent='Checking book '+attempted+' of '+candidates.length+
-          ': '+b.title+' · '+bsSeriesProposals.length+' suggestions';
-        const key=String(b.id);
-        const fingerprint=[b.title,b.author,b.isbn].join('|');
-        try{
-          const proposal=await bsSeriesFetchSuggestion(b);
-          checked++;
-          if(proposal&&bsSeriesAddProposal(proposal))remoteFound++;
-          seriesScanCache[key]={fingerprint,checkedAt:Date.now(),proposal:proposal||null};
-          delete scanFailed[key];
-          seriesScanPersist();
-        }catch(e){
-          failed++;
-          scanFailed[key]={fingerprint,retryAfter:Date.now()+retryMinutes*60*1000};
-          if(e?.message==='RATE_LIMIT'){rateLimited=true;}
-          // Do not hit a throttled catalog again in this click.
-          persistScanQueue();
-          if(rateLimited)break;
-        }
-        persistScanQueue();
-        bsSeriesRenderProposals();
+      const start=((scanCursor%pool.length)+pool.length)%pool.length;
+      const indices=[];
+      for(let step=0;step<pool.length&&indices.length<20;step++){
+        const index=(start+step)%pool.length;
+        if(eligibleForScan(pool[index]))indices.push(index);
       }
-      const completed=Object.keys(seriesScanCache).filter(k=>
-        seriesScanCache[k]?.checkedAt&&Date.now()-seriesScanCache[k].checkedAt<14*24*60*60*1000).length;
-      status.textContent='Processed '+attempted+' requests · '+checked+' successfully checked · '
-        +(localAdded+remoteFound)+' new suggestions · '+completed+' results cached on this device. '
-        +(rateLimited?'Catalog rate limit: this book will be retried later, and the next scan starts further along the library. '
-          :failed?failed+' failed lookups postponed for '+retryMinutes+' minutes. ':'')
-        +(seriesScanStop?'Stopped. ':'')+'Review suggestions before saving.';
+      if(!indices.length){
+        status.textContent='No unreviewed books available now. Cached results remain available; failed requests can be retried later.';
+        bsSeriesRenderProposals();return;
+      }
+      // Never call the remote catalog more than 4 times per click. Each book
+      // may require one Google Books request; avoid Open Library's expensive
+      // edition-by-edition sequence during bulk discovery.
+      let onlineBudget=4;
+      for(const index of indices){
+        if(seriesScanStop)break;
+        const b=pool[index],key=String(b.id);
+        const fingerprint=[b.title,b.author,b.isbn].join('|');
+        const offline=verifiedSeriesProposal(b)||matchingLocalSeries(b)
+          ||seriesDirectTitle(b)||bsSeriesExplicitTitle(b.title)
+          ||seriesFromDescription(b);
+        scanCursor=(index+1)%pool.length;
+        persistScanQueue();
+        checked++;
+        if(offline){
+          if(bsSeriesAddProposal(offline))added++;
+          seriesScanCache[key]={fingerprint,checkedAt:Date.now(),proposal:offline};
+          seriesScanPersist();
+        }else if(onlineBudget>0&&Date.now()>=remotePauseUntil){
+          onlineBudget--;onlineAttempted++;
+          try{
+            const proposal=await seriesLookupGoogleBooks(b);
+            if(proposal&&bsSeriesAddProposal(proposal))added++;
+            seriesScanCache[key]={fingerprint,checkedAt:Date.now(),proposal:proposal||null};
+            delete scanFailed[key];
+            seriesScanPersist();
+          }catch(error){
+            failed++;
+            scanFailed[key]={fingerprint,retryAfter:Date.now()+30*60*1000};
+            if(error?.message==='RATE_LIMIT'||error?.message==='CATALOG_UNAVAILABLE'){
+              setRemotePause(Date.now()+30*60*1000);
+              onlineBudget=0;
+            }
+          }
+        }
+        status.textContent='Processed '+checked+' / '+indices.length+' books in this batch · '
+          +added+' new suggestions · '+onlineAttempted+' online attempts'
+          +(Date.now()<remotePauseUntil?' · online catalog temporarily paused':'');
+      }
       bsSeriesRenderProposals();
+      const blocked=Date.now()<remotePauseUntil;
+      status.textContent='✓ Processed '+checked+' books · '+added+' new suggestions · '
+        +onlineAttempted+' online lookups'+(failed?' ('+failed+' unavailable)':'')+'. '
+        +(blocked?'Online catalog is temporarily limited; local analysis is still available. ':'')
+        +'Only confirmed or reviewable matches appear below. Continue to the next batch.';
     }finally{
       seriesScanStop=false;bsSeriesScanBusy=false;
-      btn.textContent='✧ Scan next books';btn.onclick=()=>bsSeriesScan();btn.disabled=false;
+      btn.textContent='✧ Scan next books';
+      btn.onclick=()=>bsSeriesScan();
+      btn.disabled=false;
     }
   };
   const scanLabel=document.getElementById('bs-series-scan-status');
-  if(scanLabel)scanLabel.textContent='Scans up to 20 new books per batch. Failed lookups are postponed, and the next batch continues elsewhere in your library.';
+  if(scanLabel)scanLabel.textContent='Checks 20 books per batch without stopping on one failed catalog request. Online sources are rate-limited; local matches work immediately.';
   const scanButton=document.getElementById('bs-series-scan');
   if(scanButton)scanButton.textContent='✧ Scan next books';
   const css=document.createElement('style');
