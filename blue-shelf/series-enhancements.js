@@ -160,12 +160,48 @@
     if(!String(book.author||'').trim())return false;
     return bsSeriesSameAuthor(book,Array.isArray(authors)?authors:[]);
   }
+  // Author-verified series: exact author + exact title only.
+  // Official source: https://www.rinakent.com/pl/villain-series/ruthless-empire
+  // Royal Elite #6 includes Ruthless Empire; prequel/epilogue are left unnumbered
+  // unless the book itself carries an explicit number.
+  const verifiedSeries=[
+    {author:'Rina Kent',series:'Royal Elite',titles:{
+      'cruel king':null,'deviant king':1,'steel princess':2,
+      'twisted kingdom':3,'black knight':4,'vicious prince':5,
+      'ruthless empire':6,'royal elite epilogue':null
+    }}
+  ];
+  function verifiedSeriesProposal(book){
+    const author=bsSeriesNormalized(book.author);
+    const title=seriesCleanTitle(book.title);
+    for(const set of verifiedSeries){
+      if(author!==bsSeriesNormalized(set.author))continue;
+      if(!Object.prototype.hasOwnProperty.call(set.titles,title))continue;
+      return {id:book.id,title:book.title,name:set.series,
+        number:set.titles[title],source:'Verified author series list',confidence:'Review'};
+    }
+    return null;
+  }
+  // Existing user-confirmed assignments can suggest a label for another
+  // edition of the SAME title by the SAME author. No genre-based guessing.
+  function matchingLocalSeries(book){
+    const title=seriesCleanTitle(book.title),author=bsSeriesNormalized(book.author);
+    if(!title||!author)return null;
+    const matches=books.filter(other=>other.id!==book.id&&other.series
+       &&bsSeriesNormalized(other.author)===author
+       &&seriesCleanTitle(other.title)===title);
+    const names=new Set(matches.map(b=>bsSeriesNormalized(bsSeriesParse(b)?.name)).filter(Boolean));
+    if(names.size!==1)return null;
+    const other=matches[0],parsed=bsSeriesParse(other);
+    return {id:book.id,title:book.title,name:parsed.name,number:parsed.number,
+      source:'Same title and author already in your library',confidence:'Review'};
+  }
   async function seriesLookupOpenLibrary(book){
     const isbn=seriesISBN(book);
     const queries=[];
     if(isbn)queries.push({isbn,limit:'3',fields:'key,title,author_name,edition_key'});
     if(book.author)queries.push({title:bsSeriesTitleParts(book.title),author:book.author,
-       limit:'5',fields:'key,title,author_name,edition_key'});
+       limit:'3',fields:'key,title,author_name,edition_key'});
     const seen=new Set();
     let failed=false;
     for(const params of queries){
@@ -174,7 +210,7 @@
         if(!seriesSameTitle(book.title,doc.title)||!seriesAuthorMatch(book,doc.author_name))continue;
         const inline=seriesEditionTitle(book,doc.title);
         if(inline)return inline;
-        const keys=Array.isArray(doc.edition_key)?doc.edition_key.slice(0,6):[];
+        const keys=Array.isArray(doc.edition_key)?doc.edition_key.slice(0,2):[];
         for(const key of keys){
           if(!/^OL\d+M$/.test(String(key))||seen.has(key))continue;
           seen.add(key);
@@ -221,18 +257,23 @@
     return null;
   }
   bsSeriesFetchSuggestion=async function(book){
-    const direct=seriesDirectTitle(book)||bsSeriesExplicitTitle(book.title);
+    const direct=verifiedSeriesProposal(book)||matchingLocalSeries(book)
+      ||seriesDirectTitle(book)||bsSeriesExplicitTitle(book.title);
     if(direct)return {...direct,id:book.id,title:book.title};
-    let error=null;
-    try{
-      const proposal=await seriesLookupOpenLibrary(book);
-      if(proposal)return proposal;
-    }catch(e){error=e;if(e.message==='RATE_LIMIT')throw e;}
-    try{
-      const proposal=await seriesLookupGoogleBooks(book);
-      if(proposal)return proposal;
-    }catch(e){error=e;if(e.message==='RATE_LIMIT')throw e;}
-    if(error)throw error;
+    let rateLimited=false,otherError=false;
+    // Try both catalogues independently. A 429 from Open Library must not
+    // prevent an attempt on Google Books.
+    for(const lookup of [seriesLookupOpenLibrary,seriesLookupGoogleBooks]){
+      try{
+        const proposal=await lookup(book);
+        if(proposal)return proposal;
+      }catch(e){
+        if(e?.message==='RATE_LIMIT')rateLimited=true;
+        else otherError=true;
+      }
+    }
+    if(rateLimited)throw Error('RATE_LIMIT');
+    if(otherError)throw Error('CATALOG_UNAVAILABLE');
     return null;
   };
   // Include annotated series in the local (no-network) pass.
@@ -241,7 +282,7 @@
     const result=oldLocalProposals(),seen=new Set(result.map(x=>x.id));
     for(const b of books){
       if(!b?.title||String(b.series||'').trim()||seen.has(b.id))continue;
-      const value=seriesDirectTitle(b);
+      const value=verifiedSeriesProposal(b)||matchingLocalSeries(b)||seriesDirectTitle(b);
       if(value){result.push(value);seen.add(b.id);}
     }
     return result;
@@ -265,7 +306,8 @@
   }
   function scanCandidates(){
     return books.filter(b=>b?.id&&b?.title&&!String(b.series||'').trim()
-      &&!bsSeriesExplicitTitle(b.title)&&!seriesDirectTitle(b));
+      &&!bsSeriesExplicitTitle(b.title)&&!seriesDirectTitle(b)
+      &&!verifiedSeriesProposal(b)&&!matchingLocalSeries(b));
   }
   function eligibleForScan(book){
     const key=String(book.id);
@@ -355,6 +397,5 @@
   const css=document.createElement('style');
   css.textContent='.bs-series-gap{margin:10px 0 12px;padding:10px 13px;border:1px solid #f3e1bd;background:#fffbf0;border-radius:12px;color:#84683d;font-size:12px;line-height:1.6}.bs-series-gap small{display:block;color:#938573;font-size:11px}.bs-series-gap span{color:#d7a65d}.bs-series-card-info h3{overflow-wrap:anywhere}';
   document.head.appendChild(css);
-  const label=document.getElementById('bs-series-scan-status');
-  if(label)label.textContent='Checks up to 25 books at a time. Suggestions are saved only after your approval.';
+
 })();
