@@ -324,6 +324,18 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
 .bs-series-details{border:0;background:transparent;color:#547c9b;cursor:pointer;font-size:11px;font-weight:700;white-space:nowrap}
 .bs-series-empty{grid-column:1/-1;text-align:center;padding:55px 20px;border:1px dashed #cfdfe9;border-radius:20px;color:#7994a8}.bs-series-empty span{font-size:31px}.bs-series-empty h3{color:#4d718b}
 @media(max-width:920px){.bs-series-list{grid-template-columns:1fr}}@media(max-width:700px){.bs-series-stat-row{grid-template-columns:repeat(2,minmax(0,1fr))}.bs-series-controls{grid-template-columns:1fr}.bs-series-hero{padding:23px}.bs-series-hero>span{display:none}}@media(max-width:410px){.bs-series-card{padding:15px}.bs-series-covers{width:92px}.bs-series-mini-cover{margin-right:-33px}.bs-series-volume{gap:7px;flex-wrap:wrap}.bs-series-volume-info{min-width:120px}}
+</style><style id="bs-series-auto-discovery-css">
+.bs-series-discovery{border:1px solid #dceaf0;border-radius:22px;background:linear-gradient(125deg,#edf8fd,#fff6fa);padding:21px;margin:22px 0 12px}
+.bs-series-discovery h3{font:600 24px 'Playfair Display',Georgia,serif;color:#4b708d;margin:7px 0}
+.bs-series-discovery p{font-size:13px;color:#8197a7;line-height:1.7;max-width:710px}
+.bs-series-discover-actions{display:flex;align-items:center;gap:13px;flex-wrap:wrap}
+.bs-series-discover-actions span{font-size:12px;color:#7d97a7}
+.bs-series-suggestions{display:grid;gap:9px;margin-top:10px}
+.bs-series-suggestions:empty{display:none}
+.bs-series-suggestions h4{margin:8px 0 2px;color:#577c99}
+.bs-series-proposal{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e2eaf0;border-radius:12px;padding:10px;color:#587a91;font-size:12px;line-height:1.5}
+.bs-series-proposal input{accent-color:#85b9d3}
+.bs-series-suggestions button{justify-self:start;margin-top:6px}
 </style></head>
 <body>
 
@@ -387,7 +399,8 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
  <div class="bs-series-controls"><input id="bs-series-search" type="search" oninput="renderSeriesTracker()" placeholder="⌕ Search series, books or authors..." aria-label="Search series">
  <select id="bs-series-filter" onchange="renderSeriesTracker()" aria-label="Filter series"><option value="all">All series</option><option value="reading">In progress</option><option value="finished">All owned volumes read</option><option value="unread">Not started</option></select>
  <select id="bs-series-sort" onchange="renderSeriesTracker()" aria-label="Sort series"><option value="name">Series A–Z</option><option value="progress">Most progress</option><option value="books">Most volumes</option></select></div>
- <p class="bs-series-note">Series are grouped from the <strong>Series / Volume</strong> field in your books. A completed group means you've read every volume currently in your library — not necessarily every published volume.</p>
+ <div class="bs-series-discovery"><div><span class="eyebrow">✧ DISCOVER THE SERIES</span><h3>Find series automatically ♡</h3><p>Search missing series and volume numbers using book information and Open Library. Review suggestions before adding them to your library.</p></div><div class="bs-series-discover-actions"><button type="button" id="bs-series-scan" class="primary" onclick="bsSeriesScan()">✧ Find missing series</button><span id="bs-series-scan-status" role="status" aria-live="polite">Checks up to 15 books at a time. Nothing changes until you approve it.</span></div><div id="bs-series-suggestions" class="bs-series-suggestions"></div></div>
+<p class="bs-series-note">Series are grouped using each book's <strong>Series / Volume</strong> field. The tracker counts only the volumes you own, not every published volume.</p>
  <div id="bs-series-list" class="bs-series-list"></div>
 </section>
 <section id="page-bookshelf" class="hidden">
@@ -916,6 +929,109 @@ function bsSeriesSetVolume(id,value){
  b.seriesNumber=v?Number(v):null;
  store();renderSeriesTracker();
  toast('Volume order saved ♡');
+}
+/* Conservative series discovery. Only use explicit series metadata, never infer from genre.
+   Catalog updates happen after human review; existing series and reading stats are preserved. */
+let bsSeriesScanBusy=false,bsSeriesScanSeen=new Set(),bsSeriesProposals=[];
+function bsSeriesTitleParts(value){
+ const text=String(value||'').trim();
+ const match=text.match(/^(.*?)\s*(?:[([]\s*)?((?:book|vol(?:ume)?|tom|tome)\s*#?\s*\d+(?:\.\d+)?|#\s*\d+(?:\.\d+)?)\s*[)\]]?$/i);
+ return match&&match[1].trim()?match[1].trim():text;
+}
+function bsSeriesNormalized(text){
+ return String(text||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+}
+function bsSeriesFromValue(value){
+ const val=String(value||'').trim();
+ if(!val||val.length>180)return null;
+ const parsed=bsSeriesParse({series:val});
+ if(!parsed?.name||parsed.name.length<2)return null;
+ return {name:parsed.name,number:parsed.number};
+}
+function bsSeriesFromEdition(raw){
+ if(!raw||typeof raw!=='object')return null;
+ const series=Array.isArray(raw.series)?raw.series:[raw.series];
+ for(const value of series){
+  if(typeof value==='string'){
+   const parsed=bsSeriesFromValue(value);if(parsed)return parsed;
+  }else if(value&&typeof value==='object'&&typeof value.name==='string'){
+   const parsed=bsSeriesFromValue(value.name);
+   if(parsed){const n=Number(value.position??value.number);if(Number.isFinite(n)&&n>0)parsed.number=n;return parsed}
+  }
+ }
+ return null;
+}
+async function bsSeriesFetchSuggestion(book){
+ const searchUrl='https://openlibrary.org/search.json?'+new URLSearchParams({title:bsSeriesTitleParts(book.title),author:book.author||'',limit:'2',fields:'key,title,author_name,edition_key'});
+ const response=await fetch(searchUrl,{signal:AbortSignal.timeout(11500)});
+ if(!response.ok)throw Error('Catalog search failed');
+ const result=await response.json();
+ const docs=Array.isArray(result.docs)?result.docs:[];
+ const title=bsSeriesNormalized(bsSeriesTitleParts(book.title));
+ const author=bsSeriesNormalized(book.author);
+ for(const doc of docs){
+  if(bsSeriesNormalized(bsSeriesTitleParts(doc.title))!==title)continue;
+  if(author&&Array.isArray(doc.author_name)&&doc.author_name.length&&!doc.author_name.some(a=>{
+   const aa=bsSeriesNormalized(a);return aa===author||author.includes(aa)||aa.includes(author);
+  }))continue;
+  const editionKeys=Array.isArray(doc.edition_key)?doc.edition_key.slice(0,3):[];
+  for(const key of editionKeys){
+   if(!/^OL\d+M$/.test(String(key)))continue;
+   try{
+    const r=await fetch('https://openlibrary.org/books/'+key+'.json',{signal:AbortSignal.timeout(9000)});
+    if(!r.ok)continue;
+    const info=await r.json(),candidate=bsSeriesFromEdition(info);
+    if(!candidate||!candidate.name)return null;
+    // The source explicitly calls it a series; no guess from title/author alone.
+    return {...candidate,source:'Open Library edition',id:book.id,title:book.title};
+   }catch(e){console.warn('Series edition lookup skipped',e)}
+  }
+ }
+ return null;
+}
+async function bsSeriesScan(){
+ if(bsSeriesScanBusy)return;
+ const button=$('bs-series-scan'),status=$('bs-series-scan-status');
+ const list=books.filter(b=>b.title&&!String(b.series||'').trim()&&!bsSeriesScanSeen.has(b.id)).slice(0,15);
+ if(!list.length){status.textContent='No more unchecked books in this session. Reload to run another scan.';return}
+ bsSeriesScanBusy=true;button.disabled=true;bsSeriesProposals=[];
+ try{
+  for(let i=0;i<list.length;i++){
+   const book=list[i];bsSeriesScanSeen.add(book.id);
+   status.textContent='Checking '+(i+1)+' of '+list.length+': '+book.title+'…';
+   try{
+    const suggestion=await bsSeriesFetchSuggestion(book);
+    if(suggestion)bsSeriesProposals.push(suggestion);
+   }catch(e){console.warn('Series lookup unavailable for',book.title,e)}
+  }
+  status.textContent=bsSeriesProposals.length?bsSeriesProposals.length+' suggested series found. Select the correct ones and apply.':'No confirmed series found in these '+list.length+' books. The source may not list series for your editions.';
+  bsSeriesRenderProposals();
+ }finally{bsSeriesScanBusy=false;button.disabled=false}
+}
+function bsSeriesRenderProposals(){
+ const node=$('bs-series-suggestions');node.replaceChildren();
+ if(!bsSeriesProposals.length)return;
+ const heading=document.createElement('h4');heading.textContent='Review discovered series';node.append(heading);
+ bsSeriesProposals.forEach((p,i)=>{
+  const row=document.createElement('label');row.className='bs-series-proposal';
+  const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=true;checkbox.dataset.index=i;
+  const info=document.createElement('span');info.textContent=p.title+' → '+p.name+(p.number!=null?' · Volume '+p.number:' · Volume unknown');
+  row.append(checkbox,info);node.append(row);
+ });
+ const submit=document.createElement('button');submit.className='primary';submit.type='button';submit.textContent='Apply selected suggestions ♡';submit.onclick=bsSeriesApplySuggestions;node.append(submit);
+}
+function bsSeriesApplySuggestions(){
+ let updated=0;
+ for(const check of document.querySelectorAll('#bs-series-suggestions input:checked')){
+  const p=bsSeriesProposals[Number(check.dataset.index)],b=books.find(x=>x.id===p?.id);
+  if(!b||String(b.series||'').trim())continue;
+  b.series=p.name;
+  if(p.number!=null&&Number.isFinite(p.number))b.seriesNumber=p.number;
+  updated++;
+ }
+ if(updated){store();renderSeriesTracker();toast(updated+' series details saved ♡')}
+ $('bs-series-scan-status').textContent=updated?updated+' books updated. You can scan another batch.':'No suggestions selected.';
+ bsSeriesProposals=[];$('bs-series-suggestions').replaceChildren();
 }
 function renderSeriesTracker(){
  const node=$('bs-series-list');if(!node)return;
