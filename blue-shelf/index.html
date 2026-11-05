@@ -1118,7 +1118,7 @@ function bsSeriesApplySuggestions(){
  for(const checked of document.querySelectorAll('#bs-series-suggestions input[type=checkbox]:checked')){
   const index=Number(checked.dataset.index),p=bsSeriesProposals[index],b=books.find(x=>x.id===p?.id);
   if(!b||String(b.series||'').trim())continue;
-  const name=document.querySelector('#bs-series-suggestions input[data-index="'+index+'"]')?.value?.trim()||'';
+  const name=document.querySelector('#bs-series-suggestions .bs-series-proposal-content input[data-index="'+index+'"]')?.value?.trim()||'';
   const value=document.querySelector('#bs-series-suggestions input[data-number="'+index+'"]')?.value?.trim()||'';
   if(name.length<2||name.length>180||value&&(Number(value)<=0||Number(value)>100||!Number.isFinite(Number(value))))continue;
   b.series=name;
