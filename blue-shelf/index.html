@@ -303,6 +303,27 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
 #myLocalFiles .bs-reader-file-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 #myLocalFiles .bs-reader-file-delete{background:#fff4f6;border:1px solid #edd9e0;color:#a36d84;font-weight:700}
 #myLocalFiles .bs-reader-file-delete:hover{background:#fde8ee}
+</style><style id="bs-series-tracker-css">
+.bs-series-hero{display:flex;align-items:center;justify-content:space-between;gap:20px;border-radius:27px;padding:30px 36px;background:radial-gradient(circle at 85% 15%,#f9e9f1,transparent 42%),linear-gradient(115deg,#e9f6fc,#fbfcfe);border:1px solid #dcecf3;margin-bottom:21px}
+.bs-series-hero h1{font:600 clamp(29px,3.5vw,41px) 'Playfair Display',Georgia,serif;color:#466d89;margin:9px 0}.bs-series-hero h1 span{color:#bf93ad}.bs-series-hero p{color:#7d95a7;font-size:14px;line-height:1.7;margin:0}.bs-series-hero>span{font-size:37px;white-space:nowrap}
+.bs-series-stat-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin-bottom:20px}.bs-series-stat-row>div{display:grid;gap:4px;background:#fff;border:1px solid #e4ecf2;padding:17px 20px;border-radius:18px}.bs-series-stat-row span{font-size:18px}.bs-series-stat-row strong{font-size:25px;color:#4b718f}.bs-series-stat-row small{font-size:12px;color:#87a0ae}
+.bs-series-controls{display:grid;grid-template-columns:minmax(200px,1fr) auto auto;gap:10px}.bs-series-controls input,.bs-series-controls select{width:100%;min-width:0;background:white;border:1px solid #dce8f0;border-radius:13px;padding:12px;color:#567991;font:500 13px 'DM Sans',sans-serif}
+.bs-series-note{color:#8ba0ae;font-size:12px;line-height:1.7;margin:12px 0 20px}
+.bs-series-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px;align-items:start}
+.bs-series-card{background:linear-gradient(150deg,#fff,#fcfdff);border:1px solid #e3ebf1;border-radius:22px;padding:20px;box-shadow:0 5px 20px #718fab10;min-width:0}.bs-series-card-top{display:flex;gap:15px;align-items:center;min-width:0}
+.bs-series-covers{display:flex;min-width:0;width:125px;flex-shrink:0;align-items:center;height:111px}.bs-series-mini-cover{display:block;width:49px;flex:0 0 49px;margin-right:-29px;filter:drop-shadow(2px 3px 3px #627a8c30)}.bs-series-mini-cover .cover{width:49px;height:76px;min-height:0;border-radius:5px;overflow:hidden}.bs-series-mini-cover .fallback{font-size:8px}
+.bs-series-card-info{min-width:0;flex:1}.bs-series-card-info h3{font:600 23px 'Playfair Display',Georgia,serif;color:#4e718b;margin:5px 0 6px;overflow-wrap:anywhere}.bs-series-card-info p{font-size:12px;color:#829aa9;margin:0 0 8px}
+.bs-series-flag{display:inline-block;background:#eff7f7;color:#668e8c;padding:5px 9px;border-radius:99px;font-size:11px;font-weight:700}
+.bs-series-progress{background:#e8eff3;border-radius:99px;height:10px;overflow:hidden;margin-top:17px}.bs-series-progress div{background:linear-gradient(90deg,#a8cfe2,#c5d8c2,#eac3d5);height:100%;border-radius:99px}
+.bs-series-progress-text{display:flex;justify-content:space-between;color:#8099a9;font-size:11px;margin:8px 0}.bs-series-progress-text strong{color:#62859b}.bs-series-next{font-size:12px;color:#6b8b9f;margin:11px 0}
+.bs-series-expand{width:100%;border:1px solid #e2eaf0;border-radius:12px;background:#f0f8fc;color:#577f9a;padding:10px;margin-top:9px;cursor:pointer;font-weight:700}
+.bs-series-volumes{border-top:1px solid #e8eef1;margin-top:17px;padding-top:9px}.bs-series-volume{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #edf2f5}.bs-series-volume:last-child{border-bottom:0}
+.bs-series-volume-cover{width:42px;flex:0 0 42px;border:0;padding:0;cursor:pointer;background:transparent}.bs-series-volume-cover .cover{height:64px;min-height:0;width:42px;border-radius:5px}.bs-series-volume-cover .fallback{font-size:7px}
+.bs-series-volume-info{flex:1;min-width:0;display:grid;gap:3px}.bs-series-volume-info strong{font-size:12px;line-height:1.35;color:#4c6f88;overflow-wrap:anywhere}.bs-series-volume-info span,.bs-series-volume-info small{font-size:11px;color:#819baa}
+.bs-series-volume-number{display:grid;gap:4px;font-size:10px;color:#7f98a6;text-align:center}.bs-series-volume-number input{width:59px;border:1px solid #dce8ef;border-radius:8px;padding:6px;background:#fff;text-align:center;color:#577992}
+.bs-series-details{border:0;background:transparent;color:#547c9b;cursor:pointer;font-size:11px;font-weight:700;white-space:nowrap}
+.bs-series-empty{grid-column:1/-1;text-align:center;padding:55px 20px;border:1px dashed #cfdfe9;border-radius:20px;color:#7994a8}.bs-series-empty span{font-size:31px}.bs-series-empty h3{color:#4d718b}
+@media(max-width:920px){.bs-series-list{grid-template-columns:1fr}}@media(max-width:700px){.bs-series-stat-row{grid-template-columns:repeat(2,minmax(0,1fr))}.bs-series-controls{grid-template-columns:1fr}.bs-series-hero{padding:23px}.bs-series-hero>span{display:none}}@media(max-width:410px){.bs-series-card{padding:15px}.bs-series-covers{width:92px}.bs-series-mini-cover{margin-right:-33px}.bs-series-volume{gap:7px;flex-wrap:wrap}.bs-series-volume-info{min-width:120px}}
 </style></head>
 <body>
 
@@ -326,7 +347,7 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
   </form>
  </div>
 </div>
-<header><div class="brand" onclick="go('home')"><span class="brandmark">📖</span> Blue Shelf ♡ <span style="font-size:12px;color:#98adbb;font-family:'DM Sans',sans-serif">✦</span></div><nav class="nav"><button class="active" data-nav="home" onclick="go('home')">Home</button><button data-nav="library" onclick="go('library')">My Library</button><button data-nav="stats" onclick="go('stats')">Reading Stats</button><button data-nav="wishlist" onclick="go('wishlist')">Wishlist</button><button data-nav="bookshelf" onclick="go('bookshelf')">🌷 Bookshelf</button><button data-nav="journal" onclick="go('journal')">✎ Reading Journal</button><button data-nav="challenges" onclick="go('challenges')">✨ Challenges</button><button data-nav="files" onclick="go('files')">📂 My Files</button></nav><div class="bs-account-wrap"><span id="saveState" class="save-state" style="display:none" aria-live="polite"></span><button id="bs-account-toggle" class="bs-account-toggle" type="button" aria-expanded="false" aria-controls="bs-account-panel"><span id="bs-account-avatar" class="bs-account-avatar">📖</span><span id="bs-account-name">My profile</span><span aria-hidden="true">⌄</span></button><div id="bs-account-panel" class="bs-account-panel" role="dialog" aria-label="My profile" hidden><div class="bs-account-heading">🌸 My little profile ♡</div><form id="bs-account-form"><label class="bs-account-photo-label" for="bs-account-photo"><span id="bs-account-preview" class="bs-account-preview">📖</span><span>Change profile photo<small>JPG, PNG or WEBP · max 5 MB</small></span></label><input type="file" id="bs-account-photo" accept="image/jpeg,image/png,image/webp" hidden><label for="bs-account-display">Display name</label><input type="text" id="bs-account-display" maxlength="40" placeholder="Your bookish name" required><small id="bs-account-email"></small><button type="submit" id="bs-account-save" class="bs-account-save">Save profile ♡</button><p id="bs-account-status" role="status" aria-live="polite"></p></form><button id="bs-profile-open" type="button" class="bs-account-cloud-sync" onclick="bsProfileOpen()">✿ My Reading Profile →</button><button id="bs-account-cloud-sync" type="button" class="bs-account-cloud-sync" onclick="document.getElementById('bs-account-panel').hidden=true;document.getElementById('bs-account-toggle').setAttribute('aria-expanded','false');go('sync');bsInspectSync()">☁ Cloud Sync &amp; Backup →</button><button id="bs-account-logout" type="button">↪ Log out</button></div></div></header><main>
+<header><div class="brand" onclick="go('home')"><span class="brandmark">📖</span> Blue Shelf ♡ <span style="font-size:12px;color:#98adbb;font-family:'DM Sans',sans-serif">✦</span></div><nav class="nav"><button class="active" data-nav="home" onclick="go('home')">Home</button><button data-nav="library" onclick="go('library')">My Library</button><button data-nav="stats" onclick="go('stats')">Reading Stats</button><button data-nav="wishlist" onclick="go('wishlist')">Wishlist</button><button data-nav="bookshelf" onclick="go('bookshelf')">🌷 Bookshelf</button><button data-nav="series" onclick="go('series')">♡ Series Tracker</button><button data-nav="journal" onclick="go('journal')">✎ Reading Journal</button><button data-nav="challenges" onclick="go('challenges')">✨ Challenges</button><button data-nav="files" onclick="go('files')">📂 My Files</button></nav><div class="bs-account-wrap"><span id="saveState" class="save-state" style="display:none" aria-live="polite"></span><button id="bs-account-toggle" class="bs-account-toggle" type="button" aria-expanded="false" aria-controls="bs-account-panel"><span id="bs-account-avatar" class="bs-account-avatar">📖</span><span id="bs-account-name">My profile</span><span aria-hidden="true">⌄</span></button><div id="bs-account-panel" class="bs-account-panel" role="dialog" aria-label="My profile" hidden><div class="bs-account-heading">🌸 My little profile ♡</div><form id="bs-account-form"><label class="bs-account-photo-label" for="bs-account-photo"><span id="bs-account-preview" class="bs-account-preview">📖</span><span>Change profile photo<small>JPG, PNG or WEBP · max 5 MB</small></span></label><input type="file" id="bs-account-photo" accept="image/jpeg,image/png,image/webp" hidden><label for="bs-account-display">Display name</label><input type="text" id="bs-account-display" maxlength="40" placeholder="Your bookish name" required><small id="bs-account-email"></small><button type="submit" id="bs-account-save" class="bs-account-save">Save profile ♡</button><p id="bs-account-status" role="status" aria-live="polite"></p></form><button id="bs-profile-open" type="button" class="bs-account-cloud-sync" onclick="bsProfileOpen()">✿ My Reading Profile →</button><button id="bs-account-cloud-sync" type="button" class="bs-account-cloud-sync" onclick="document.getElementById('bs-account-panel').hidden=true;document.getElementById('bs-account-toggle').setAttribute('aria-expanded','false');go('sync');bsInspectSync()">☁ Cloud Sync &amp; Backup →</button><button id="bs-account-logout" type="button">↪ Log out</button></div></div></header><main>
 <section id="page-profile" class="hidden bs-reader-profile" aria-label="My Reading Profile">
   <div class="bs-profile-topline"><span class="eyebrow">✦ YOUR BOOKISH CORNER</span><button type="button" class="secondary" onclick="go('library')">← Back to My Library</button></div>
   <div class="bs-profile-hero">
@@ -360,6 +381,15 @@ html:not(.bs-authenticated) #bs-recovery-banner{display:none!important}
 <section class="hidden" id="page-wishlist"><div class="sectiontitle"><div><div class="eyebrow">FUTURE FAVORITES</div><h2>My Wishlist ♡</h2><p class="sub">Books you want to buy or discover.</p></div><button class="primary" onclick="openForm(null,true)">＋ Add to wishlist</button></div><div class="shelf" id="wishlistShelf"></div></section>
 
 
+<section id="page-series" class="hidden bs-series-page">
+ <div class="bs-series-hero"><div><div class="eyebrow">✿ ALL THE STORIES YET TO COME</div><h1>My Series Tracker <span>♡</span></h1><p>Keep the volumes together, find your next read and watch your favorite stories grow.</p></div><span aria-hidden="true">📚 🌷</span></div>
+ <div id="bs-series-stats" class="bs-series-stat-row" aria-label="Series progress"></div>
+ <div class="bs-series-controls"><input id="bs-series-search" type="search" oninput="renderSeriesTracker()" placeholder="⌕ Search series, books or authors..." aria-label="Search series">
+ <select id="bs-series-filter" onchange="renderSeriesTracker()" aria-label="Filter series"><option value="all">All series</option><option value="reading">In progress</option><option value="finished">All owned volumes read</option><option value="unread">Not started</option></select>
+ <select id="bs-series-sort" onchange="renderSeriesTracker()" aria-label="Sort series"><option value="name">Series A–Z</option><option value="progress">Most progress</option><option value="books">Most volumes</option></select></div>
+ <p class="bs-series-note">Series are grouped from the <strong>Series / Volume</strong> field in your books. A completed group means you've read every volume currently in your library — not necessarily every published volume.</p>
+ <div id="bs-series-list" class="bs-series-list"></div>
+</section>
 <section id="page-bookshelf" class="hidden">
  <div class="sectiontitle"><div><div class="eyebrow">YOUR LITTLE BOOK NOOK</div><h2>My Virtual Bookshelf 🌷</h2><p class="sub">A cozy home for every book — click a spine to edit its details.</p></div><button class="primary" onclick="go('library')">View covers ↗</button></div>
  
@@ -487,7 +517,7 @@ function saveLibraryNow(){
 }
 
 function toast(t){$('toast').textContent=t;$('toast').classList.remove('hidden');setTimeout(()=>$('toast').classList.add('hidden'),2500)}
-function go(page){document.querySelectorAll('[id^="page-"]').forEach(el=>el.classList.toggle('hidden',el.id!=='page-'+page));document.querySelectorAll('[data-nav]').forEach(el=>el.classList.toggle('active',el.dataset.nav===page));if(page==='home')renderHome();if(page==='library')renderLibrary();if(page==='stats')renderStats();if(page==='wishlist')renderWishlist();if(page==='bookshelf')renderBookshelf();if(page==='journal')renderJournal();if(page==='files')renderLocalFiles();if(page==='cloud')renderCloud();window.scrollTo({top:0,behavior:'smooth'})}
+function go(page){document.querySelectorAll('[id^="page-"]').forEach(el=>el.classList.toggle('hidden',el.id!=='page-'+page));document.querySelectorAll('[data-nav]').forEach(el=>el.classList.toggle('active',el.dataset.nav===page));if(page==='home')renderHome();if(page==='library')renderLibrary();if(page==='stats')renderStats();if(page==='wishlist')renderWishlist();if(page==='bookshelf')renderBookshelf();if(page==='series')renderSeriesTracker();if(page==='journal')renderJournal();if(page==='files')renderLocalFiles();if(page==='cloud')renderCloud();window.scrollTo({top:0,behavior:'smooth'})}
 function sorted(list,mode='recent'){
  const alphabet=(a,b)=>String(a||'').localeCompare(String(b||''),undefined,{sensitivity:'base',numeric:true});
  const number=(v)=>{const n=Number(v);return Number.isFinite(n)&&n>0?n:null};
@@ -728,7 +758,7 @@ function fillFromOnline(){
   $('finderQuery').value=[title,author].filter(Boolean).join(' ');
   searchBooks();
 }
-function saveBook(e,id){e.preventDefault();let f=new FormData(e.target),title=String(f.get('title')||'').trim();if(!title)return;let previous=books.find(b=>b.id===id);let b={id:previous?.id||('b'+Date.now()+Math.random().toString(36).slice(2)),added:previous?.added||Date.now(),title,author:String(f.get('author')||'').trim(),genre:String(f.get('genre')||'').trim(),status:String(f.get('status')),rating:Number(f.get('rating'))||0,pages:Number(f.get('pages'))||0,finished:String(f.get('finished')||''),series:String(f.get('series')||'').trim(),cover:String(f.get('cover')||'').trim(),notes:String(f.get('notes')||'').trim(),publisher:String(f.get('publisher')||'').trim(),published:String(f.get('published')||'').trim(),isbn:String(f.get('isbn')||'').trim(),language:String(f.get('language')||'').trim(),description:cleanDescription(f.get('description')).trim(),metadataSource:previous?.metadataSource||'',pagesApproximate:previous?.pagesApproximate||false,pagesSource:previous?.pagesSource||'',currentPage:previous?.currentPage||0,progressPercent:previous?.progressPercent||0,started:previous?.started||'',wishlist:f.has('wishlist')};if(previous)books=books.map(x=>x.id===id?b:x);else books.push(b);store();closeModal();go(document.querySelector('[data-nav].active')?.dataset.nav||'library');toast(previous?'Book updated!':'Book added!')}
+function saveBook(e,id){e.preventDefault();let f=new FormData(e.target),title=String(f.get('title')||'').trim();if(!title)return;let previous=books.find(b=>b.id===id);let b={id:previous?.id||('b'+Date.now()+Math.random().toString(36).slice(2)),added:previous?.added||Date.now(),title,author:String(f.get('author')||'').trim(),genre:String(f.get('genre')||'').trim(),status:String(f.get('status')),rating:Number(f.get('rating'))||0,pages:Number(f.get('pages'))||0,finished:String(f.get('finished')||''),series:String(f.get('series')||'').trim(),cover:String(f.get('cover')||'').trim(),notes:String(f.get('notes')||'').trim(),publisher:String(f.get('publisher')||'').trim(),published:String(f.get('published')||'').trim(),isbn:String(f.get('isbn')||'').trim(),language:String(f.get('language')||'').trim(),description:cleanDescription(f.get('description')).trim(),metadataSource:previous?.metadataSource||'',pagesApproximate:previous?.pagesApproximate||false,pagesSource:previous?.pagesSource||'',currentPage:previous?.currentPage||0,progressPercent:previous?.progressPercent||0,started:previous?.started||'',seriesNumber:previous?.seriesNumber??null,wishlist:f.has('wishlist')};if(previous)books=books.map(x=>x.id===id?b:x);else books.push(b);store();closeModal();go(document.querySelector('[data-nav].active')?.dataset.nav||'library');toast(previous?'Book updated!':'Book added!')}
 function detail(id){
  const b=books.find(x=>x.id===id);if(!b)return;
  $('modalTitle').textContent='Book details';
@@ -815,6 +845,88 @@ function bsQuickSave(event,id){
  else if(active==='profile'&&typeof bsProfileRender==='function')bsProfileRender();
  $('bs-quick-save-state').textContent='✓ Saved locally. Your account will sync shortly.';
  toast('Reading updates saved ♡');
+}
+/* Series Tracker — groups by existing book metadata; never guesses missing books or total series length. */
+let bsSeriesExpanded=new Set();
+function bsSeriesParse(book){
+ const raw=String(book.series||'').trim();
+ if(!raw)return null;
+ let name=raw,number=null;
+ // Common imported values: "The Folk of the Air #2", "Series (Book 3)", "Series, Vol. 1".
+ const variants=[
+  /^(.*?)\s*\(\s*(?:book|volume|vol\.?|tom|tome|#)\s*(\d+(?:\.\d+)?)\s*\)\s*$/i,
+  /^(.*?)\s*(?:[,;:]\s*)?(?:#|book\s*#?\s*|volume\s*#?\s*|vol\.?\s*#?\s*|tom\s*#?\s*|tome\s*#?\s*)(\d+(?:\.\d+)?)\s*$/i,
+  /^(.*?)\s*\(\s*(\d+(?:\.\d+)?)\s*\)\s*$/,
+ ];
+ for(const pattern of variants){
+  const match=raw.match(pattern);
+  if(match&&match[1].trim()){name=match[1].trim();number=Number(match[2]);break}
+ }
+ name=name.replace(/\s*[,;:#\-–]\s*$/,'').trim();
+ if(!name)return null;
+ const explicit=Number(book.seriesNumber);
+ if(book.seriesNumber!==null&&book.seriesNumber!==undefined&&book.seriesNumber!==''&&Number.isFinite(explicit)&&explicit>0)number=explicit;
+ return {name,number};
+}
+function bsSeriesGroups(){
+ const map=new Map();
+ for(const b of books){
+  const series=bsSeriesParse(b);if(!series)continue;
+  const key=series.name.normalize('NFKD').toLowerCase().replace(/\s+/g,' ').trim();
+  if(!map.has(key))map.set(key,{key,name:series.name,items:[]});
+  map.get(key).items.push({book:b,number:series.number});
+ }
+ return [...map.values()].map(group=>{
+  group.items.sort((a,b)=>{
+   if(a.number!=null&&b.number!=null)return a.number-b.number||(a.book.title||'').localeCompare(b.book.title||'');
+   if(a.number!=null)return -1;
+   if(b.number!=null)return 1;
+   return (a.book.title||'').localeCompare(b.book.title||'');
+  });
+  group.total=group.items.length;
+  group.read=group.items.filter(x=>x.book.status==='Read').length;
+  group.reading=group.items.filter(x=>x.book.status==='Currently Reading').length;
+  group.progress=Math.round(100*group.read/Math.max(1,group.total));
+  group.next=group.items.find(x=>x.book.status==='Currently Reading')||group.items.find(x=>x.book.status!=='Read'&&x.book.status!=='DNF');
+  return group;
+ });
+}
+function bsSeriesCard(group){
+ const key=group.key;
+ const expanded=bsSeriesExpanded.has(key);
+ const flag=group.read===group.total?'✓ All owned volumes read':group.read>0||group.reading>0?'✿ In progress':'♡ Not started';
+ const display=group.items.slice(0,5);
+ const covers=display.map(({book})=>'<span class="bs-series-mini-cover">'+cover(book)+'</span>').join('');
+ const meta=group.items.length+' '+(group.items.length===1?'book':'books')+' · '+group.read+' read';
+ const items=expanded?'<div class="bs-series-volumes">'+group.items.map(({book,number},i)=>{
+  const n=number!=null?String(number):'—';
+  const status=book.status||'To Be Read';
+  return '<div class="bs-series-volume"><button type="button" class="bs-series-volume-cover" onclick="detail('+JSON.stringify(book.id).replace(/"/g,'&quot;')+')">'+cover(book)+'</button><div class="bs-series-volume-info"><strong>'+esc(book.title||'Untitled')+'</strong><span>'+esc(book.author||'Unknown author')+'</span><small>'+esc(status)+(book.rating?' · ★ '+esc(book.rating):'')+'</small></div><label class="bs-series-volume-number">Volume<input type="number" min="0.1" max="999" step="0.5" value="'+(number??'')+'" placeholder="?" aria-label="Volume number for '+esc(book.title||'book')+'" onchange="bsSeriesSetVolume('+JSON.stringify(book.id).replace(/"/g,'&quot;')+',this.value)"></label><button type="button" class="bs-series-details" onclick="detail('+JSON.stringify(book.id).replace(/"/g,'&quot;')+')">Details ↗</button></div>';
+ }).join('')+'</div>':'';
+ return '<article class="bs-series-card"><div class="bs-series-card-top"><div class="bs-series-covers">'+covers+'</div><div class="bs-series-card-info"><span class="eyebrow">BOOK SERIES</span><h3>'+esc(group.name)+'</h3><p>'+esc(meta)+'</p><span class="bs-series-flag">'+flag+'</span></div></div><div class="bs-series-progress"><div style="width:'+group.progress+'%"></div></div><div class="bs-series-progress-text"><span>'+group.read+' of '+group.total+' owned volumes finished</span><strong>'+group.progress+'%</strong></div>'+(group.next?'<p class="bs-series-next">Up next: <strong>'+esc(group.next.book.title)+'</strong></p>':'')+'<button type="button" class="bs-series-expand" aria-expanded="'+expanded+'" onclick="bsSeriesToggle('+JSON.stringify(key).replace(/"/g,'&quot;')+')">'+(expanded?'Hide volumes ↑':'View volumes ↓')+'</button>'+items+'</article>';
+}
+function bsSeriesToggle(key){
+ if(bsSeriesExpanded.has(key))bsSeriesExpanded.delete(key);else bsSeriesExpanded.add(key);
+ renderSeriesTracker();
+}
+function bsSeriesSetVolume(id,value){
+ const b=books.find(x=>x.id===id);if(!b)return;
+ const v=String(value||'').trim();
+ if(v&&(!Number.isFinite(Number(v))||Number(v)<=0||Number(v)>999)){toast('Choose a volume number between 0.5 and 999.');renderSeriesTracker();return}
+ b.seriesNumber=v?Number(v):null;
+ store();renderSeriesTracker();
+ toast('Volume order saved ♡');
+}
+function renderSeriesTracker(){
+ const node=$('bs-series-list');if(!node)return;
+ const all=bsSeriesGroups();
+ const volumes=all.reduce((n,g)=>n+g.total,0),read=all.reduce((n,g)=>n+g.read,0);
+ const complete=all.filter(g=>g.read===g.total).length;
+ $('bs-series-stats').innerHTML='<div><span>📚</span><strong>'+all.length+'</strong><small>Series tracked</small></div><div><span>🌸</span><strong>'+volumes+'</strong><small>Catalogued volumes</small></div><div><span>✓</span><strong>'+read+'</strong><small>Volumes read</small></div><div><span>✨</span><strong>'+complete+'</strong><small>Owned sets finished</small></div>';
+ const search=($('bs-series-search')?.value||'').toLocaleLowerCase().trim(),filter=$('bs-series-filter')?.value||'all',sort=$('bs-series-sort')?.value||'name';
+ let visible=all.filter(g=>(!search||(g.name+' '+g.items.map(x=>x.book.title+' '+x.book.author).join(' ')).toLocaleLowerCase().includes(search))&&(filter==='all'||filter==='reading'&&(g.read>0&&g.read<g.total||g.reading>0)||filter==='finished'&&g.read===g.total||filter==='unread'&&g.read===0&&g.reading===0));
+ visible.sort((a,b)=>sort==='progress'?b.progress-a.progress||a.name.localeCompare(b.name):sort==='books'?b.total-a.total||a.name.localeCompare(b.name):a.name.localeCompare(b.name));
+ node.innerHTML=visible.length?visible.map(bsSeriesCard).join(''):'<div class="bs-series-empty"><span>📖</span><h3>No series to show yet</h3><p>Add or edit a book and fill in its <strong>Series / Volume</strong> field. Your series will appear here automatically.</p><button type="button" class="secondary" onclick="go(\'library\')">Go to My Library →</button></div>';
 }
 function removeBook(id){if(!confirm('Delete this book from your library?'))return;books=books.filter(x=>x.id!==id);store();closeModal();go(document.querySelector('[data-nav].active')?.dataset.nav||'library');toast('Book deleted')}
 function showModal(){$('dialog').classList.remove('hidden');document.body.style.overflow='hidden'}function closeModal(){$('dialog').classList.add('hidden');document.body.style.overflow=''}document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
