@@ -3,9 +3,32 @@
 (function(){
   'use strict';
   const previousGroups=bsSeriesGroups;
+  // Catalog imports sometimes place the complete book title before the actual
+  // series label, e.g. "Book title: The Honey and Ice Series".
+  // Only shorten unambiguous series-labelled suffixes, for display and grouping.
+  // The saved series field remains untouched.
+  function cleanDisplayName(value){
+    const name=String(value||'').trim();
+    const match=name.match(/^[^:：]{3,180}[:：]\\s*((?:(?:The|A|An)\\s+)?[^:：]{3,100}\\s+(?:Series|Duet|Trilogy|Saga|Quartet|Chronicles|Cycle))$/i);
+    return match?match[1].trim():name;
+  }
   bsSeriesGroups=function(){
-    const groups=previousGroups();
+    const raw=previousGroups();
+    const grouped=new Map();
+    for(const group of raw){
+      const name=cleanDisplayName(group.name);
+      const key=bsSeriesNormalized(name);
+      if(!grouped.has(key))grouped.set(key,{...group,key,name,items:[]});
+      grouped.get(key).items.push(...group.items);
+    }
+    const groups=[...grouped.values()];
     groups.forEach(group=>{
+      group.items.sort((a,b)=>a.number!=null&&b.number!=null?a.number-b.number:a.number!=null?-1:b.number!=null?1:String(a.book.title||'').localeCompare(String(b.book.title||'')));
+      group.total=group.items.length;
+      group.read=group.items.filter(item=>item.book.status==='Read').length;
+      group.reading=group.items.filter(item=>item.book.status==='Currently Reading').length;
+      group.progress=Math.round(100*group.read/Math.max(1,group.total));
+      group.next=group.items.find(item=>item.book.status==='Currently Reading')||group.items.find(item=>item.book.status!=='Read'&&item.book.status!=='DNF');
       const present=new Set(group.items.map(item=>item.number).filter(n=>Number.isInteger(n)&&n>0&&n<=100));
       const highest=Math.max(0,...present);
       group.gaps=highest>=2&&highest<=30
@@ -82,7 +105,7 @@
     }
   };
   const css=document.createElement('style');
-  css.textContent='.bs-series-gap{margin:10px 0 12px;padding:10px 13px;border:1px solid #f3e1bd;background:#fffbf0;border-radius:12px;color:#84683d;font-size:12px;line-height:1.6}.bs-series-gap small{display:block;color:#938573;font-size:11px}.bs-series-gap span{color:#d7a65d}';
+  css.textContent='.bs-series-gap{margin:10px 0 12px;padding:10px 13px;border:1px solid #f3e1bd;background:#fffbf0;border-radius:12px;color:#84683d;font-size:12px;line-height:1.6}.bs-series-gap small{display:block;color:#938573;font-size:11px}.bs-series-gap span{color:#d7a65d}.bs-series-card-info h3{overflow-wrap:anywhere}';
   document.head.appendChild(css);
   const label=document.getElementById('bs-series-scan-status');
   if(label)label.textContent='Checks up to 25 books at a time. Suggestions are saved only after your approval.';
