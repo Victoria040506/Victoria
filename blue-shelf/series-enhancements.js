@@ -151,9 +151,19 @@
     return seriesEditionTitle(book,book.title);
   }
   async function seriesGetJSON(url){
-    const response=await fetch(url,{signal:AbortSignal.timeout(11000)});
-    if(response.status===429)throw Error('RATE_LIMIT');
-    if(!response.ok)throw Error('CATALOG_UNAVAILABLE');
+    let response;
+    try{response=await fetch(url,{signal:AbortSignal.timeout(11000)});}
+    catch(e){const error=new Error('NETWORK_ERROR');error.detail=String(e?.message||e);throw error;}
+    if(!response.ok){
+      const error=new Error(response.status===429?'RATE_LIMIT':response.status===403?'ACCESS_DENIED':'HTTP_ERROR');
+      error.status=response.status;
+      const retry=response.headers.get('Retry-After');
+      if(retry){
+        const seconds=Number(retry);
+        error.retryAfterMs=Number.isFinite(seconds)?seconds*1000:Math.max(0,Date.parse(retry)-Date.now());
+      }
+      throw error;
+    }
     return response.json();
   }
   function seriesAuthorMatch(book,authors){
@@ -437,10 +447,11 @@
           checked++;
         }catch(error){
           errors++;
-          scanFailed[String(book.id)]={fingerprint,retryAfter:Date.now()+30*60000};
+          console.warn('Series lookup failed',book.title,error?.message,error?.status||'',error?.detail||'');
+          scanFailed[String(book.id)]={fingerprint,retryAfter:Date.now()+5*60000};
           if(error?.message==='RATE_LIMIT'){
             rateLimited=true;
-            setRemotePause(Date.now()+30*60000);
+            setRemotePause(Date.now()+Math.min(30*60000,Math.max(90*1000,Number(error.retryAfterMs)||90*1000)));
           }
         }
         scanCursor=(index+1)%pool.length;
@@ -449,10 +460,10 @@
         if(rateLimited)break;
       }
       const message=rateLimited
-        ?'The catalog blocked further requests after '+(checked+errors)+' attempt(s). '
-          +'Online scanning is paused for 30 minutes; unvisited books were not counted as checked.'
+        ?'The catalog returned HTTP 429 (rate limit) after '+(checked+errors)+' attempt(s). '
+          +'The next attempt will follow the short retry cooldown; unvisited books are not counted as checked.'
         :'This run: '+checked+' books checked online, '+remoteAdded+' new online proposals'
-          +(errors?', '+errors+' temporarily unavailable':'')+'. '
+          +(errors?', '+errors+' unavailable (see browser console for HTTP status)':'')+'. '
           +'You can continue with another batch or review suggestions.';
       seriesScanShow(message);
     }catch(error){
@@ -480,7 +491,7 @@
   if(seriesDiscoveryRoot&&seriesDiscoveryActions&&onlineScanButton){
     const version=document.createElement('div');
     version.className='bs-scan-version';
-    version.textContent='Series discovery v8 · separate local and online progress';
+    version.textContent='Series discovery v9 · API error diagnostics';
     seriesDiscoveryActions.prepend(version);
     const localButton=document.createElement('button');
     localButton.type='button';localButton.className='secondary bs-local-scan';
@@ -533,7 +544,7 @@
     const originalShow=seriesScanShow;
     // The visible version label proves which script actually executed.
     bsLocalTotal=books.filter(b=>b?.title&&!String(b.series||'').trim()).length;
-    seriesScanShow('Version 8 loaded. Run the local scan to fill its progress bar. Online scanning is separately limited by the catalog.');
+    seriesScanShow('Version 9 loaded. Online lookup reports HTTP errors instead of assuming every failure is a 30-minute block.');
   }
   const css=document.createElement('style');
   css.textContent='.bs-series-gap{margin:10px 0 12px;padding:10px 13px;border:1px solid #f3e1bd;background:#fffbf0;border-radius:12px;color:#84683d;font-size:12px;line-height:1.6}.bs-series-gap small{display:block;color:#938573;font-size:11px}.bs-series-gap span{color:#d7a65d}.bs-series-card-info h3{overflow-wrap:anywhere}.bs-scan-version{font-size:11px;letter-spacing:.04em;color:#7394a8;font-weight:700;padding:5px 0}.bs-local-scan{margin-right:8px}.bs-series-scan-progress{width:100%;margin:12px 0 0;font-size:12px;color:#6d91a8}.bs-series-scan-progress-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:7px}.bs-series-scan-progress-track{height:8px;background:#e7eef3;border-radius:99px;overflow:hidden}.bs-series-scan-progress-track span{display:block;height:100%;background:#8cafc8;border-radius:99px}.bs-series-scan-progress small{display:block;margin-top:7px}.bs-local-progress-fill{background:#a6cdb6!important}';
