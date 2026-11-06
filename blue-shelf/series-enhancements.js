@@ -491,7 +491,7 @@
   if(seriesDiscoveryRoot&&seriesDiscoveryActions&&onlineScanButton){
     const version=document.createElement('div');
     version.className='bs-scan-version';
-    version.textContent='Series discovery v9 · API error diagnostics';
+    version.textContent='Series discovery v10 · metadata export';
     seriesDiscoveryActions.prepend(version);
     const localButton=document.createElement('button');
     localButton.type='button';localButton.className='secondary bs-local-scan';
@@ -546,8 +546,48 @@
     bsLocalTotal=books.filter(b=>b?.title&&!String(b.series||'').trim()).length;
     seriesScanShow('Version 9 loaded. Online lookup reports HTTP errors instead of assuming every failure is a 30-minute block.');
   }
+
+  // Safe, metadata-only export for offline series matching and review.
+  // Does not include notes, reading history, covers, account details or ebook files.
+  function bsExportSeriesMetadata(){
+    try{
+      const records=books.filter(b=>b&&typeof b.title==='string').map(b=>({
+        id:String(b.id||''),title:String(b.title||''),
+        author:String(b.author||''),isbn:String(b.isbn||''),
+        series:String(b.series||''),seriesNumber:b.seriesNumber??null,
+        publisher:String(b.publisher||''),published:String(b.published||''),
+        language:String(b.language||'')
+      }));
+      const payload={format:'blue-shelf-series-metadata',version:1,
+        exportedAt:new Date().toISOString(),books:records};
+      const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});
+      const href=URL.createObjectURL(blob);
+      const anchor=document.createElement('a');
+      anchor.href=href;
+      anchor.download='blue-shelf-series-metadata-'+new Date().toISOString().slice(0,10)+'.json';
+      document.body.appendChild(anchor);anchor.click();anchor.remove();
+      setTimeout(()=>URL.revokeObjectURL(href),5000);
+      seriesScanShow('Exported '+records.length+' book metadata records. The file contains titles, authors, ISBNs and existing series only. No library data was changed.');
+    }catch(e){
+      console.error('Series metadata export',e);
+      seriesScanShow('Could not export book metadata: '+(e.message||e));
+    }
+  }
+  if(seriesDiscoveryActions){
+    const exportButton=document.createElement('button');
+    exportButton.type='button';
+    exportButton.className='secondary bs-series-export';
+    exportButton.textContent='↓ Export series metadata';
+    exportButton.title='Download titles, authors and ISBNs only — no notes or EPUB files';
+    exportButton.onclick=bsExportSeriesMetadata;
+    seriesDiscoveryActions.appendChild(exportButton);
+    const text=document.createElement('p');
+    text.className='bs-series-export-hint';
+    text.textContent='Online catalog lookup is restricted. Export only book metadata for more accurate offline series matching; no library changes are made.';
+    seriesDiscoveryActions.appendChild(text);
+  }
   const css=document.createElement('style');
-  css.textContent='.bs-series-gap{margin:10px 0 12px;padding:10px 13px;border:1px solid #f3e1bd;background:#fffbf0;border-radius:12px;color:#84683d;font-size:12px;line-height:1.6}.bs-series-gap small{display:block;color:#938573;font-size:11px}.bs-series-gap span{color:#d7a65d}.bs-series-card-info h3{overflow-wrap:anywhere}.bs-scan-version{font-size:11px;letter-spacing:.04em;color:#7394a8;font-weight:700;padding:5px 0}.bs-local-scan{margin-right:8px}.bs-series-scan-progress{width:100%;margin:12px 0 0;font-size:12px;color:#6d91a8}.bs-series-scan-progress-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:7px}.bs-series-scan-progress-track{height:8px;background:#e7eef3;border-radius:99px;overflow:hidden}.bs-series-scan-progress-track span{display:block;height:100%;background:#8cafc8;border-radius:99px}.bs-series-scan-progress small{display:block;margin-top:7px}.bs-local-progress-fill{background:#a6cdb6!important}';
+  css.textContent='.bs-series-gap{margin:10px 0 12px;padding:10px 13px;border:1px solid #f3e1bd;background:#fffbf0;border-radius:12px;color:#84683d;font-size:12px;line-height:1.6}.bs-series-gap small{display:block;color:#938573;font-size:11px}.bs-series-gap span{color:#d7a65d}.bs-series-card-info h3{overflow-wrap:anywhere}.bs-scan-version{font-size:11px;letter-spacing:.04em;color:#7394a8;font-weight:700;padding:5px 0}.bs-local-scan{margin-right:8px}.bs-series-scan-progress{width:100%;margin:12px 0 0;font-size:12px;color:#6d91a8}.bs-series-scan-progress-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:7px}.bs-series-scan-progress-track{height:8px;background:#e7eef3;border-radius:99px;overflow:hidden}.bs-series-scan-progress-track span{display:block;height:100%;background:#8cafc8;border-radius:99px}.bs-series-scan-progress small{display:block;margin-top:7px} .bs-local-progress-fill{background:#a6cdb6!important}.bs-series-export{margin-left:8px}.bs-series-export-hint{flex-basis:100%;width:100%;font-size:12px;color:#6e90a3;margin:4px 0 0}';
   document.head.appendChild(css);
 
 })();
