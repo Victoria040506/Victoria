@@ -197,7 +197,7 @@ function draw(){
     const book=books.find(b=>b.id===p.id);
     if(!book||String(book.genre||'').trim())continue;
     if(typeof bsMarkEditedBook==='function')bsMarkEditedBook(book.id);
-    book.genre=p.genre;changed++;
+    book.genre=p.genre;book.genres=typeof window.bsGenresClean==='function'?window.bsGenresClean([p.genre,...(Array.isArray(book.genres)?book.genres:[])]):[p.genre];changed++;
    }
    if(changed){store();if(typeof renderLibrary==='function')renderLibrary()}
    proposals=[];draw();
