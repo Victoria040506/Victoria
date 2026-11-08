@@ -765,8 +765,8 @@ function chooseFoundBook(i){
  set('author',String((b.author_name||[]).slice(0,4).join(', ')).slice(0,140));
  const subjects=Array.isArray(b.subject)?b.subject:[];
  const choices=['Fantasy','Romance','Science Fiction','Mystery','Thriller','Horror','Historical Fiction','Young Adult','Comics','Nonfiction','Biography','Poetry'];
- const genre=choices.find(g=>subjects.some(x=>String(x).toLowerCase().includes(g.toLowerCase())));
- if(genre)set('genre',genre);
+ const genre=(typeof bsGenreFromSubjects==='function'?bsGenreFromSubjects(subjects):'')||choices.find(g=>subjects.some(x=>String(x).toLowerCase().includes(g.toLowerCase())));
+ if(genre&&!String(f.elements.genre.value||'').trim())set('genre',genre);
  if(Number(b.number_of_pages_median)>0 && !Number(f.elements.pages.value))set('pages',Math.round(b.number_of_pages_median));
  if(Number(b.first_publish_year)>0 && !f.elements.published.value)set('published',String(b.first_publish_year));
  if(Array.isArray(b.publisher)&&b.publisher.length && !f.elements.publisher.value)set('publisher',String(b.publisher[0]).slice(0,180));
@@ -1550,7 +1550,7 @@ const JSZIP_URL='https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', E
 function pickXml(xml,localName){return [...xml.getElementsByTagName('*')].find(n=>n.localName===localName)}
 function allXml(xml,localName){return [...xml.getElementsByTagName('*')].filter(n=>n.localName===localName)}
 async function compressImage(blob){try{const img=await createImageBitmap(blob);const cvs=document.createElement('canvas');const scale=Math.min(180/img.width,270/img.height,1);cvs.width=Math.max(1,Math.round(img.width*scale));cvs.height=Math.max(1,Math.round(img.height*scale));cvs.getContext('2d').drawImage(img,0,0,cvs.width,cvs.height);img.close();return cvs.toDataURL('image/webp',.72)}catch{return ''}}
-async function getEpubInfo(file){await loadExternalScript(JSZIP_URL,'JSZip');let zip=await window.JSZip.loadAsync(file);let container=await zip.file('META-INF/container.xml')?.async('string');if(!container)throw new Error('Missing EPUB manifest');let xml=new DOMParser().parseFromString(container,'application/xml');const path=allXml(xml,'rootfile')[0]?.getAttribute('full-path');if(!path)throw new Error('Missing OPF');const opf=new DOMParser().parseFromString(await zip.file(path).async('string'),'application/xml');const get=n=>allXml(opf,n)[0]?.textContent?.trim()||'';const title=get('title')||file.name.replace(/\.epub$/i,''),author=get('creator');let coverId=allXml(opf,'meta').find(n=>n.getAttribute('name')==='cover')?.getAttribute('content');let coverNode=allXml(opf,'item').find(n=>n.getAttribute('id')===coverId||n.getAttribute('properties')?.includes('cover-image'))||allXml(opf,'item').find(n=>(n.getAttribute('href')||'').toLowerCase().includes('cover')&&/image\//.test(n.getAttribute('media-type')||''));let cover='';if(coverNode){const href=coverNode.getAttribute('href');const root=path.includes('/')?path.substring(0,path.lastIndexOf('/')+1):'';const parts=[];for(const p of (root+href).split('/')){if(p==='..')parts.pop();else if(p&&p!=='.')parts.push(p)}const entry=zip.file(parts.join('/'));if(entry){const imgBlob=new Blob([await entry.async('blob')],{type:coverNode.getAttribute('media-type')||'image/jpeg'});cover=await compressImage(imgBlob)}}return {title,author,publisher:get('publisher'),published:get('date'),isbn:get('identifier'),description:get('description'),cover};}
+async function getEpubInfo(file){await loadExternalScript(JSZIP_URL,'JSZip');let zip=await window.JSZip.loadAsync(file);let container=await zip.file('META-INF/container.xml')?.async('string');if(!container)throw new Error('Missing EPUB manifest');let xml=new DOMParser().parseFromString(container,'application/xml');const path=allXml(xml,'rootfile')[0]?.getAttribute('full-path');if(!path)throw new Error('Missing OPF');const opf=new DOMParser().parseFromString(await zip.file(path).async('string'),'application/xml');const get=n=>allXml(opf,n)[0]?.textContent?.trim()||'';const title=get('title')||file.name.replace(/\.epub$/i,''),author=get('creator');let coverId=allXml(opf,'meta').find(n=>n.getAttribute('name')==='cover')?.getAttribute('content');let coverNode=allXml(opf,'item').find(n=>n.getAttribute('id')===coverId||n.getAttribute('properties')?.includes('cover-image'))||allXml(opf,'item').find(n=>(n.getAttribute('href')||'').toLowerCase().includes('cover')&&/image\//.test(n.getAttribute('media-type')||''));let cover='';if(coverNode){const href=coverNode.getAttribute('href');const root=path.includes('/')?path.substring(0,path.lastIndexOf('/')+1):'';const parts=[];for(const p of (root+href).split('/')){if(p==='..')parts.pop();else if(p&&p!=='.')parts.push(p)}const entry=zip.file(parts.join('/'));if(entry){const imgBlob=new Blob([await entry.async('blob')],{type:coverNode.getAttribute('media-type')||'image/jpeg'});cover=await compressImage(imgBlob)}}return {title,author,publisher:get('publisher'),published:get('date'),isbn:get('identifier'),description:get('description'),cover,genre:typeof bsGenreFromSubjects==='function'?bsGenreFromSubjects(allXml(opf,'subject').map(n=>n.textContent.trim())):''};}
 async function bsDetailReadingButton(id){
  try{
   const rec=await dbGetFile(id);
@@ -1593,10 +1593,10 @@ async function importEbooks(){
    const old=books.find(x=>bsBookTitleKey(x.title)===bsBookTitleKey(meta.title)&&(!meta.author||!x.author||bsBookTitleKey(x.author)===bsBookTitleKey(meta.author)));
    if(old){
     let enriched=false;
-    for(const field of ['author','cover','description','publisher','published','isbn'])if(!old[field]&&meta[field]){old[field]=meta[field];enriched=true}
+    for(const field of ['author','cover','description','publisher','published','isbn','genre'])if(!old[field]&&meta[field]){old[field]=meta[field];enriched=true}
     if(enriched){updated++;changed=true}
    }else{
-    books.push({id:'ebook'+Date.now()+Math.random().toString(36).slice(2),added:Date.now(),title:meta.title||file.name,author:meta.author||'',cover:meta.cover||'',description:meta.description||'',publisher:meta.publisher||'',published:meta.published||'',isbn:meta.isbn||'',genre:'',status:'To Be Read',rating:0,pages:0,finished:'',notes:'',series:'',wishlist:false});
+    books.push({id:'ebook'+Date.now()+Math.random().toString(36).slice(2),added:Date.now(),title:meta.title||file.name,author:meta.author||'',cover:meta.cover||'',description:meta.description||'',publisher:meta.publisher||'',published:meta.published||'',isbn:meta.isbn||'',genre:meta.genre||'',status:'To Be Read',rating:0,pages:0,finished:'',notes:'',series:'',wishlist:false});
     added++;changed=true;
    }
   }
@@ -3342,5 +3342,6 @@ const bsProfileAuthWatcher=setInterval(()=>{
 <script defer src="./series-enhancements.js?v=20261106-v10-metadata-export"></script>
 <script defer src="./cloud-sync-indicator.js?v=20261108-floating-v3"></script>
 <script defer src="./reading-stats-period.js?v=20261108-stats-self-contained-v3"></script>
+<script defer src="./genre-autofill.js?v=20261108-genres-v1"></script>
 </body>
 </html>
