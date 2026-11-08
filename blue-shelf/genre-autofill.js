@@ -45,6 +45,34 @@ function exactLocalGenre(b){
  }
  return null;
 }
+// Offline inference from explicitly recorded metadata. Descriptive language is
+// weaker than an actual catalog subject, so every result stays reviewable.
+const explicitGenreSignals=[
+ ['Fantasy',/(?:\b(?:fantasy|fantastyka|fantastycznej|fantastyczny|fantastyczna|fantasy romance|romantasy|urban fantasy|high fantasy|epic fantasy)\b)/iu],
+ ['Romance',/(?:\b(?:romance novel|romance book|romance story|romantic novel|contemporary romance|dark romance|sports romance|historical romance|romans(?:u|em|owa|owy)?|powieść romantyczna|powiesc romantyczna)\b)/iu],
+ ['Science Fiction',/(?:\b(?:science fiction|sci.fi|dystopian novel|dystopian fiction|fantastyka naukowa|powieść dystopijna|powiesc dystopijna|space opera|cyberpunk novel)\b)/iu],
+ ['Mystery',/(?:\b(?:mystery novel|mystery series|detective novel|detective fiction|cozy mystery|crime novel|crime fiction|kryminał(?:u|em)?|powieść kryminalna|powiesc kryminalna)\b)/iu],
+ ['Thriller',/(?:\b(?:psychological thriller|thriller novel|thriller psychologiczny|thrillera|thrillerem|thriller)\b)/iu],
+ ['Horror',/(?:\b(?:horror novel|horror story|horror fiction|powieść grozy|powiesc grozy|horror)\b)/iu],
+ ['Historical Fiction',/(?:\b(?:historical fiction|historical novel|powieść historyczna|powiesc historyczna)\b)/iu],
+ ['Comics',/(?:\b(?:graphic novel|graphic novels|manga|manhwa|komiks|komiksy)\b)/iu],
+ ['Biography',/(?:\b(?:biography|autobiography|memoir|biografia|autobiografia|wspomnienia)\b)/iu],
+ ['Poetry',/(?:\b(?:poetry collection|poem collection|zbiór wierszy|zbior wierszy|poezja)\b)/iu]
+];
+function localBookGenre(b){
+ const copies=exactLocalGenre(b);
+ if(copies)return copies;
+ // Imported EPUB subjects are sometimes stored as subject/category metadata.
+ const subjects=[b.subject,b.subjects,b.categories,b.category].flat().filter(Boolean);
+ const tag=classify(subjects);
+ if(tag)return {genre:tag,source:'Stored catalog/EPUB subject · review'};
+ const description=String(b.description||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').slice(0,1400);
+ if(!description)return null;
+ const matches=explicitGenreSignals.filter(([,re])=>re.test(description));
+ // No genre inference if conflicting explicit descriptions.
+ if(matches.length!==1)return null;
+ return {genre:matches[0][0],source:'Genre mentioned in book description · review'};
+}
 async function onlineGenre(b){
  if(!b.author&&!b.isbn)return null;
  const cleanISBN=isbn(b.isbn);
@@ -70,9 +98,9 @@ async function onlineGenre(b){
 }
 const ui=document.createElement('section');
 ui.id='bs-auto-genre-box';ui.className='bs-auto-genre-box';
-ui.innerHTML='<div class="bs-auto-genre-heading"><div><strong>🌷 Automatic book genres</strong><p>Fill missing genres using saved book metadata and verified catalog matches. Existing genres are never changed.</p></div><button id="bs-auto-genre-start" type="button">✧ Find missing genres</button></div><p id="bs-auto-genre-feedback" role="status" aria-live="polite"></p><div id="bs-auto-genre-review" class="bs-auto-genre-review"></div>';
+ui.innerHTML='<div class="bs-auto-genre-heading"><div><strong>🌷 Automatic book genres</strong><p>Check your whole library offline using book descriptions and metadata. Review suggestions before saving. Existing genres stay unchanged.</p></div><button id="bs-auto-genre-start" type="button">✧ Analyze all books offline</button><button id="bs-auto-genre-online" type="button">⌕ Try online catalog (optional)</button></div><p id="bs-auto-genre-feedback" role="status" aria-live="polite"></p><div id="bs-auto-genre-review" class="bs-auto-genre-review"></div>';
 const style=document.createElement('style');
-style.textContent='#bs-auto-genre-box{border:1px solid #deebef;background:linear-gradient(110deg,#eef8fc,#fff4f9);border-radius:20px;padding:18px 20px;margin:18px 0 24px;color:#587e95}#bs-auto-genre-box .bs-auto-genre-heading{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}#bs-auto-genre-box strong{font:600 19px Georgia,serif;color:#47718e}#bs-auto-genre-box p{font-size:12px;line-height:1.6;margin:6px 0}#bs-auto-genre-box button{border:1px solid #cfe0e8;border-radius:99px;background:white;padding:9px 15px;color:#477b99;cursor:pointer;font-weight:700}#bs-auto-genre-box button:disabled{opacity:.55;cursor:wait}#bs-auto-genre-review{max-height:320px;overflow-y:auto}#bs-auto-genre-review label{display:flex;gap:9px;align-items:center;padding:8px;border-bottom:1px solid #e9e8ed;font-size:12px}#bs-auto-genre-review label span{flex:1;min-width:0;overflow-wrap:anywhere}#bs-auto-genre-review label em{color:#7995a7;font-style:normal}#bs-auto-genre-review .bs-genre-apply{margin:12px 0 4px;background:#83acc7;color:white;border:0}';
+style.textContent='#bs-auto-genre-box{border:1px solid #deebef;background:linear-gradient(110deg,#eef8fc,#fff4f9);border-radius:20px;padding:18px 20px;margin:18px 0 24px;color:#587e95}#bs-auto-genre-box .bs-auto-genre-heading{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}#bs-auto-genre-box strong{font:600 19px Georgia,serif;color:#47718e}#bs-auto-genre-box p{font-size:12px;line-height:1.6;margin:6px 0}#bs-auto-genre-box button{border:1px solid #cfe0e8;border-radius:99px;background:white;padding:9px 15px;color:#477b99;cursor:pointer;font-weight:700}#bs-auto-genre-box button:disabled{opacity:.55;cursor:wait}#bs-auto-genre-box .bs-auto-genre-heading button{margin:3px 4px}#bs-auto-genre-feedback{padding:6px 0}#bs-auto-genre-review label{cursor:pointer}#bs-auto-genre-review{max-height:320px;overflow-y:auto}#bs-auto-genre-review label{display:flex;gap:9px;align-items:center;padding:8px;border-bottom:1px solid #e9e8ed;font-size:12px}#bs-auto-genre-review label span{flex:1;min-width:0;overflow-wrap:anywhere}#bs-auto-genre-review label em{color:#7995a7;font-style:normal}#bs-auto-genre-review .bs-genre-apply{margin:12px 0 4px;background:#83acc7;color:white;border:0}';
 document.head.append(style);
 const section=library.querySelector('.sectiontitle');
 if(section)section.insertAdjacentElement('afterend',ui);
@@ -109,27 +137,51 @@ function draw(){
   review.append(apply);
  }
 }
-start.addEventListener('click',async()=>{
- if(scanning)return;
- scanning=true;start.disabled=true;proposals=[];
- const missing=books.filter(b=>b?.title&&!String(b.genre||'').trim());
- const found=new Set();
- const add=(b,result)=>{if(!result||found.has(b.id))return;found.add(b.id);proposals.push({id:b.id,title:b.title,genre:result.genre,source:result.source})};
- try{
-  for(const b of missing){
-   const local=exactLocalGenre(b);if(local)add(b,local);
+function findMissing(){
+ return books.filter(b=>b?.title&&!String(b.genre||'').trim());
+}
+function collectLocal(){
+ proposals=[];const missing=findMissing(),found=new Set();
+ for(const b of missing){
+  const value=localBookGenre(b);
+  if(value&&!found.has(b.id)){
+   found.add(b.id);
+   proposals.push({id:b.id,title:b.title,genre:value.genre,source:value.source});
   }
-  // Only make a small number of external requests per click. Never fire
-  // thousands of requests or silently mark unqueried books as checked.
-  const key='blue-shelf-genre-checked-v1';
+ }
+ draw();
+ feedback.textContent='✓ Offline analysis: '+missing.length+' books checked · '+proposals.length+
+  ' suggested genres. No internet used. '+(proposals.length?'Review each match below before applying.':
+  'No clear genre evidence in the saved metadata; books were not guessed.');
+ return found;
+}
+start.addEventListener('click',()=>{
+ if(scanning)return;
+ try{collectLocal()}
+ catch(error){
+  console.error('Genre offline classification failed',error);
+  feedback.textContent='Could not analyze saved book descriptions: '+error.message;
+ }
+});
+const online=ui.querySelector('#bs-auto-genre-online');
+online.addEventListener('click',async()=>{
+ if(scanning)return;
+ scanning=true;online.disabled=true;start.disabled=true;
+ try{
+  const found=collectLocal();
+  const missing=findMissing();
+  const key='blue-shelf-genre-checked-v2';
   let cached={};try{cached=JSON.parse(localStorage.getItem(key)||'{}')||{}}catch(e){}
-  const candidates=missing.filter(b=>!found.has(b.id)&&(!cached[b.id]||cached[b.id].fingerprint!==[b.title,b.author,b.isbn].join('|'))).slice(0,8);
+  const candidates=missing.filter(b=>!found.has(b.id)&&(!cached[b.id]||cached[b.id].fingerprint!==[b.title,b.author,b.isbn].join('|'))).slice(0,5);
   let checked=0,failures=0,rateLimit=false;
   for(const b of candidates){
-   feedback.textContent='Checking catalog '+(checked+1)+' / '+candidates.length+' · '+b.title;
+   feedback.textContent='Optional online catalog: '+(checked+failures+1)+' / '+candidates.length+' · '+b.title;
    try{
     const result=await onlineGenre(b);checked++;
-    if(result)add(b,result);
+    if(result){
+     found.add(b.id);
+     proposals.push({id:b.id,title:b.title,genre:result.genre,source:result.source+' · review'});
+    }
     cached[b.id]={fingerprint:[b.title,b.author,b.isbn].join('|'),checkedAt:Date.now()};
    }catch(e){
     failures++;
@@ -138,10 +190,14 @@ start.addEventListener('click',async()=>{
    try{localStorage.setItem(key,JSON.stringify(cached))}catch(e){}
   }
   draw();
-  feedback.textContent=proposals.length+' suggested genres · '+checked+' checked online · '+missing.length+' books missing genre. '
-   +(rateLimit?'Catalog rate limit reached; try later. ':'')
-   +(failures&&!rateLimit?failures+' lookups unavailable. ':'')
-   +'Review the suggestions before applying.';
- }finally{scanning=false;start.disabled=false}
+  feedback.textContent=proposals.length+' suggested genres (offline + online) · '+checked+
+   ' successful online lookups. '+(rateLimit?'Catalog limited requests. Offline matches remain available. ':
+   failures?failures+' online lookups failed. ':'')+'Only selected suggestions will be saved.';
+ }catch(error){
+  console.error('Optional genre lookup failed',error);
+  feedback.textContent='Online lookup unavailable: '+error.message+'. You can still use offline analysis.';
+ }finally{
+  scanning=false;start.disabled=false;online.disabled=false;
+ }
 });
 })();
