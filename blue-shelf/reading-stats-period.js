@@ -21,6 +21,17 @@ if(!toolbar){
 let feedback=document.getElementById('bs-stats-period-feedback');
 if(!feedback){feedback=document.createElement('p');feedback.id='bs-stats-period-feedback';feedback.className='bs-stats-period-feedback';toolbar.insertAdjacentElement('afterend',feedback)}
 const select=toolbar.querySelector('#bs-period-select');
+const genreMode=document.createElement('select');
+genreMode.id='bs-genre-stats-mode';
+genreMode.setAttribute('aria-label','Group genre chart by main genre or subgenre');
+genreMode.innerHTML='<option value="parent">Main genres</option><option value="detail">Detailed subgenres</option>';
+const genreModeLabel=document.createElement('label');
+genreModeLabel.htmlFor='bs-genre-stats-mode';genreModeLabel.textContent='Genre detail';
+const genreModeWrap=document.createElement('div');
+genreModeWrap.append(genreModeLabel,genreMode);
+toolbar.append(genreModeWrap);
+try{genreMode.value=localStorage.getItem('blue-shelf-stats-genre-mode')||'parent'}catch(e){genreMode.value='parent'}
+
 const key='blue-shelf-stats-period-v3';
 let selected;
 try{selected=localStorage.getItem(key)||String(new Date().getFullYear())}catch(e){selected=String(new Date().getFullYear())}
@@ -75,7 +86,12 @@ function replaceCards(list){
 function replaceGenres(list){
  const node=val('genres');if(!node)return;
  const groups=new Map();
- for(const book of list){const name=String(book.genre||'Other').trim()||'Other';groups.set(name,(groups.get(name)||0)+1)}
+ for(const book of list){
+  const detail=String(book.genre||'Other').trim()||'Other';
+  const name=genreMode.value==='parent'&&typeof window.bsGenreParent==='function'
+    ?window.bsGenreParent(detail):detail;
+  groups.set(name,(groups.get(name)||0)+1);
+ }
  node.replaceChildren();
  if(!list.length){node.textContent='No finished books recorded in this period. ♡';return}
  for(const [name,n] of [...groups].sort((a,b)=>b[1]-a[1])){
@@ -178,6 +194,10 @@ function display(){
  }catch(e){console.error('Reading Stats initialization',e);feedback.classList.add('error');feedback.textContent='Statistics could not load: '+e.message}
  finally{busy=false}
 }
+genreMode.addEventListener('change',()=>{
+ try{localStorage.setItem('blue-shelf-stats-genre-mode',genreMode.value)}catch(e){}
+ display();
+});
 select.addEventListener('change',()=>{
  selected=select.value;
  try{localStorage.setItem(key,selected)}catch(e){}
