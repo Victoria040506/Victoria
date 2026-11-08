@@ -19,10 +19,54 @@ const rules=[
  ['Poetry',/\b(?:poetry|poems|wiersze|poezja)\b/i],
  ['Literary Fiction',/\b(?:literary fiction|contemporary fiction|fiction literaria|literatura piękna|literatura piekna)\b/i]
 ];
+// Detailed genres use explicitly labeled metadata, not plot keywords.
+const bsSubgenreRules=[
+ ['Cozy Mystery',/\b(?:cozy|cosy)\s+(?:mystery|mysteries|detective|murder)\b/i],
+ ['Dark Academia',/\bdark academia\b/i],
+ ['Dark Fantasy',/\bdark fantasy\b/i],
+ ['Urban Fantasy',/\burban fantasy\b/i],
+ ['Epic Fantasy',/\b(?:epic|high)\s+fantasy\b/i],
+ ['Romantasy',/\b(?:romantasy|fantasy romance|romantic fantasy|fae romance|faerie romance)\b/i],
+ ['Paranormal Romance',/\b(?:paranormal romance|supernatural romance|vampire romance|shifter romance|werewolf romance|monster romance|demon romance)\b/i],
+ ['Dark Romance',/\b(?:dark (?:contemporary|new adult|college|high school|billionaire|bully|mafia|mm|m\/m|rockstar|sports|marriage)?\s*romance)\b/i],
+ ['Mafia Romance',/\b(?:mafia romance|mob romance|bratva romance)\b/i],
+ ['Sports Romance',/\b(?:sports romance|hockey romance|football romance|baseball romance|racing romance|formula 1 romance|f1 romance)\b/i],
+ ['Historical Romance',/\b(?:historical romance|regency romance|victorian romance)\b/i],
+ ['Romantic Suspense',/\bromantic suspense\b/i],
+ ['Romantic Comedy',/\b(?:romantic comedy|romcom|rom-com)\b/i],
+ ['Contemporary Romance',/\b(?:contemporary romance|modern romance)\b/i],
+ ['College Romance',/\b(?:college romance|campus romance|university romance)\b/i],
+ ['Bully Romance',/\b(?:bully romance|high school bully romance)\b/i],
+ ['MM Romance',/\b(?:mm romance|m\/m romance|queer romance)\b/i],
+ ['Psychological Thriller',/\bpsychological thriller\b/i],
+ ['Crime Thriller',/\b(?:crime thriller|legal thriller|detective thriller)\b/i],
+ ['Gothic Horror',/\b(?:gothic horror|gothic fiction)\b/i],
+ ['Graphic Novel',/\bgraphic novels?\b/i],
+ ['Manga',/\bmanga\b/i],
+ ['Manhwa',/\bmanhwa\b/i]
+];
+const bsGenreParents={
+ 'Cozy Mystery':'Mystery','Dark Academia':'Literary Fiction',
+ 'Dark Fantasy':'Fantasy','Urban Fantasy':'Fantasy','Epic Fantasy':'Fantasy','Romantasy':'Fantasy',
+ 'Paranormal Romance':'Romance','Dark Romance':'Romance','Mafia Romance':'Romance',
+ 'Sports Romance':'Romance','Historical Romance':'Romance','Romantic Suspense':'Romance',
+ 'Romantic Comedy':'Romance','Contemporary Romance':'Romance','College Romance':'Romance',
+ 'Bully Romance':'Romance','MM Romance':'Romance',
+ 'Psychological Thriller':'Thriller','Crime Thriller':'Thriller','Gothic Horror':'Horror',
+ 'Graphic Novel':'Comics','Manga':'Comics','Manhwa':'Comics'
+};
+window.bsGenreParent=g=>bsGenreParents[g]||g||'Other';
+function bsGenreFromText(text){
+ const clean=String(text||'').replace(/<[^>]*>/g,' ').slice(0,2500);
+ const hit=bsSubgenreRules.find(([,pattern])=>pattern.test(clean));
+ return hit?hit[0]:'';
+}
 function classify(subjects){
  const values=Array.isArray(subjects)?subjects:[subjects];
  const found=[];
  for(const value of values){
+  const specific=bsGenreFromText(value);
+  if(specific)return specific;
   const raw=String(value||'').trim();
   if(!raw||raw.length>160)continue;
   for(const [genre,regex] of rules){
@@ -67,6 +111,10 @@ function localBookGenre(b){
  const tag=classify(subjects);
  if(tag)return {genre:tag,source:'Stored catalog/EPUB subject · review'};
  const description=String(b.description||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').slice(0,1400);
+ const titleSubgenre=bsGenreFromText(b.title);
+ if(titleSubgenre)return {genre:titleSubgenre,source:'Explicit subgenre in title · review'};
+ const descriptionSubgenre=bsGenreFromText(description);
+ if(descriptionSubgenre)return {genre:descriptionSubgenre,source:'Subgenre mentioned in description · review'};
  if(!description)return null;
  const matches=explicitGenreSignals.filter(([,re])=>re.test(description));
  // No genre inference if conflicting explicit descriptions.
@@ -235,10 +283,19 @@ importPicker.addEventListener('change',async()=>{
     skipped++;continue;
    }
    // Restrict automatic imports to the same approved genres as local detection.
-   const allowed=[...new Set([...rules.map(pair=>pair[0]),'Literary Fiction'])];
+   const allowed=[...new Set([...rules.map(pair=>pair[0]),...bsSubgenreRules.map(pair=>pair[0]),'Literary Fiction'])];
    if(!allowed.includes(candidate.genre)){skipped++;continue}
    const source=String(candidate.source||'Imported metadata review').slice(0,110);
-   if(addProposal({id:book.id,title:book.title,genre:candidate.genre,
+   const existingProposal=proposals.find(p=>p.id===book.id);
+   // Upgrade a generic suggestion with a more specific one for the same
+   // book, but never modify a genre already saved in the actual library.
+   const upgrade=existingProposal&&existingProposal.genre!==candidate.genre
+     &&bsGenreParents[candidate.genre]===existingProposal.genre;
+   if(upgrade){
+     existingProposal.genre=candidate.genre;
+     existingProposal.source='Imported detailed suggestion · '+source;
+     added++;
+   }else if(addProposal({id:book.id,title:book.title,genre:candidate.genre,
       source:'Imported suggestion · '+source})){added++}else skipped++;
   }
   draw();
