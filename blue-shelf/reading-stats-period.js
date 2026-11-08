@@ -132,19 +132,56 @@ function goal(list){
   hint.textContent='The annual reading goal can be edited in '+yearNow()+' view.';
  }
 }
+
 const former=renderStats;
-renderStats=function(){
- former();
+let rendering=false;
+let errorMessage=null;
+function showProblem(error){
+ console.error('Reading stats period render',error);
+ notice.textContent='Some reading statistics could not be displayed: '+(error?.message||String(error))
+   +'. Your books have not been changed.';
+}
+function fillPeriod(){
  options();
- const list=filtered();
- statCards(list);genreChart(list);authorChart(list);monthlyChart(list);dayGrid();goal(list);
- const unknown=allRead().filter(b=>dateYear(b.finished)===null).length;
- notice.textContent=selected==='all'?'All-time totals include '+unknown+' read book'+(unknown===1?'':'s')+' without a valid finish date. These cannot be attributed to a specific year.'
-  :'Showing books finished in '+selected+'. '+unknown+' read book'+(unknown===1?' has':'s have')+' no valid finish date and '+(unknown===1?'is':'are')+' not assigned to a year.';
+ if(rendering)return;
+ rendering=true;
+ try{
+  const list=filtered();
+  // Each visual is independent; a failure in one must not blank the rest.
+  for(const fn of [statCards,genreChart,authorChart,monthlyChart]){
+   try{fn(list)}catch(error){showProblem(error)}
+  }
+  try{dayGrid()}catch(error){showProblem(error)}
+  try{goal(list)}catch(error){showProblem(error)}
+  const unknown=allRead().filter(b=>dateYear(b.finished)===null).length;
+  if(!errorMessage){
+   notice.textContent=selected==='all'
+    ?'All-time includes '+unknown+' read book'+(unknown===1?'':'s')+' with no valid finish date.'
+    :'Showing books completed in '+selected+'. '+unknown+' read book'+(unknown===1?' has':'s have')+' no valid finish date.';
+  }
+ }catch(error){showProblem(error)}
+ finally{rendering=false}
+}
+renderStats=function(){
+ try{former()}catch(error){console.warn('Base Reading Stats render failed; using period statistics instead.',error)}
+ fillPeriod();
 };
 select.addEventListener('change',()=>{
  selected=select.value;
- try{localStorage.setItem(periodKey,selected)}catch(e){}
+ try{localStorage.setItem(periodKey,selected)}catch(error){}
  renderStats();
+});
+// Fill the selector at startup rather than waiting for another page navigation.
+try{options()}catch(error){showProblem(error)}
+if(!page.classList.contains('hidden'))renderStats();
+// Some navigation paths replace the go() wrapper without refreshing this view.
+page.addEventListener('click',event=>{
+ if(event.target.closest('#bs-period-select'))return;
+});
+// Do not allow the dropdown to remain blank even when the base app rerenders.
+document.querySelectorAll('[data-nav="stats"]').forEach(btn=>{
+ btn.addEventListener('click',()=>{
+  queueMicrotask(()=>{if(!page.classList.contains('hidden'))renderStats()});
+ });
 });
 })();
