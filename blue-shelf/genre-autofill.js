@@ -206,6 +206,50 @@ exportButton.onclick=()=>{
   feedback.textContent='Exported '+items.length+' books missing genres. Includes titles, authors, ISBN and publisher descriptions, not private notes or ebook files.';
  }catch(e){feedback.textContent='Could not export metadata: '+e.message}
 };
+const importButton=document.createElement('button');
+importButton.type='button';
+importButton.textContent='↑ Import reviewed genre suggestions';
+const importPicker=document.createElement('input');
+importPicker.type='file';
+importPicker.accept='.json,application/json';
+importPicker.style.display='none';
+importPicker.setAttribute('aria-label','Choose Blue Shelf genre suggestions JSON');
+importButton.addEventListener('click',()=>importPicker.click());
+importPicker.addEventListener('change',async()=>{
+ const file=importPicker.files?.[0];
+ importPicker.value='';
+ if(!file)return;
+ try{
+  if(file.size>5*1024*1024)throw Error('File exceeds 5 MB');
+  const payload=JSON.parse(await file.text());
+  if(payload?.type!=='blue-shelf-genre-proposals'||payload.version!==1||!Array.isArray(payload.books))
+   throw Error('This is not a Blue Shelf genre suggestions export');
+  if(payload.books.length>10000)throw Error('Too many suggestions in this file');
+  const existing=new Map(books.map(book=>[String(book.id),book]));
+  let added=0,skipped=0;
+  for(const candidate of payload.books){
+   if(!candidate||typeof candidate.id!=='string'||typeof candidate.genre!=='string'
+    ||typeof candidate.title!=='string'){skipped++;continue}
+   const book=existing.get(candidate.id);
+   if(!book||String(book.genre||'').trim()||normalize(book.title)!==normalize(candidate.title)){
+    skipped++;continue;
+   }
+   // Restrict automatic imports to the same approved genres as local detection.
+   const allowed=[...new Set([...rules.map(pair=>pair[0]),'Literary Fiction'])];
+   if(!allowed.includes(candidate.genre)){skipped++;continue}
+   const source=String(candidate.source||'Imported metadata review').slice(0,110);
+   if(addProposal({id:book.id,title:book.title,genre:candidate.genre,
+      source:'Imported suggestion · '+source})){added++}else skipped++;
+  }
+  draw();
+  feedback.textContent='Imported '+added+' additional genre suggestions for review; '
+   +skipped+' skipped (duplicate, unmatched or already categorized). Nothing was saved to your books.';
+ }catch(error){
+  console.error('Genre suggestions import',error);
+  feedback.textContent='Could not import suggestions: '+error.message+'. No books were modified.';
+ }
+});
+actions.append(importButton,importPicker);
 actions.append(exportButton);
 ui.append(actions);
 style.textContent+='#bs-auto-genre-box .bs-genre-export-actions{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px}';
