@@ -87,10 +87,12 @@ function replaceGenres(list){
  const node=val('genres');if(!node)return;
  const groups=new Map();
  for(const book of list){
-  const detail=String(book.genre||'Other').trim()||'Other';
-  const name=genreMode.value==='parent'&&typeof window.bsGenreParent==='function'
-    ?window.bsGenreParent(detail):detail;
-  groups.set(name,(groups.get(name)||0)+1);
+  const details=typeof window.bsGenresOf==='function'?window.bsGenresOf(book):[book.genre].filter(Boolean);
+  const unique=new Set((details.length?details:['Other']).map(detail=>
+    genreMode.value==='parent'&&typeof window.bsGenreParentOf==='function'
+      ?window.bsGenreParentOf(detail):detail
+  ));
+  for(const name of unique)groups.set(name,(groups.get(name)||0)+1);
  }
  node.replaceChildren();
  if(!list.length){node.textContent='No finished books recorded in this period. ♡';return}
