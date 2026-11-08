@@ -516,13 +516,16 @@ let lastSavedAt=null;
 function updateSaveState(message,error=false){const node=document.getElementById('saveState');if(!node)return;node.textContent=message;node.classList.toggle('error',error);}
 function store(){
  const copied=books;
+ // Mark an edit immediately. Waiting for the disk write allowed an in-flight
+ // sync to restore older book statuses before it noticed the new revision.
+ if(typeof scheduleCloudSave==='function')scheduleCloudSave();
+ updateSaveState('Saving changes to this device…');
  try{localStorage.setItem(KEY,JSON.stringify(books))}
  catch(err){console.warn('localStorage quota exceeded; IndexedDB save will be used',err)}
  bsDurableWrite(copied).then(()=>{
   lastSavedAt=new Date();
   updateSaveState('✓ Saved securely on this device at '+lastSavedAt.toLocaleTimeString());
   bsDurableBanner(books.length+' books saved locally. Cloud synchronization will follow when connected.');
-  if(typeof scheduleCloudSave==='function')scheduleCloudSave();
  }).catch(err=>{
   console.error('Blue Shelf save failed',err);
   updateSaveState('⚠️ SAVE FAILED — EXPORT BACKUP',true);
@@ -781,7 +784,7 @@ function fillFromOnline(){
   $('finderQuery').value=[title,author].filter(Boolean).join(' ');
   searchBooks();
 }
-function saveBook(e,id){e.preventDefault();let f=new FormData(e.target),title=String(f.get('title')||'').trim();if(!title)return;let previous=books.find(b=>b.id===id);let b={id:previous?.id||('b'+Date.now()+Math.random().toString(36).slice(2)),added:previous?.added||Date.now(),title,author:String(f.get('author')||'').trim(),genre:String(f.get('genre')||'').trim(),status:String(f.get('status')),rating:Number(f.get('rating'))||0,pages:Number(f.get('pages'))||0,finished:String(f.get('finished')||''),series:String(f.get('series')||'').trim(),cover:String(f.get('cover')||'').trim(),notes:String(f.get('notes')||'').trim(),publisher:String(f.get('publisher')||'').trim(),published:String(f.get('published')||'').trim(),isbn:String(f.get('isbn')||'').trim(),language:String(f.get('language')||'').trim(),description:cleanDescription(f.get('description')).trim(),metadataSource:previous?.metadataSource||'',pagesApproximate:previous?.pagesApproximate||false,pagesSource:previous?.pagesSource||'',currentPage:previous?.currentPage||0,progressPercent:previous?.progressPercent||0,started:previous?.started||'',seriesNumber:previous?.seriesNumber??null,wishlist:f.has('wishlist')};if(previous)books=books.map(x=>x.id===id?b:x);else books.push(b);store();closeModal();go(document.querySelector('[data-nav].active')?.dataset.nav||'library');toast(previous?'Book updated!':'Book added!')}
+function saveBook(e,id){e.preventDefault();let f=new FormData(e.target),title=String(f.get('title')||'').trim();if(!title)return;let previous=books.find(b=>b.id===id);let b={id:previous?.id||('b'+Date.now()+Math.random().toString(36).slice(2)),added:previous?.added||Date.now(),title,author:String(f.get('author')||'').trim(),genre:String(f.get('genre')||'').trim(),status:String(f.get('status')),rating:Number(f.get('rating'))||0,pages:Number(f.get('pages'))||0,finished:String(f.get('finished')||''),series:String(f.get('series')||'').trim(),cover:String(f.get('cover')||'').trim(),notes:String(f.get('notes')||'').trim(),publisher:String(f.get('publisher')||'').trim(),published:String(f.get('published')||'').trim(),isbn:String(f.get('isbn')||'').trim(),language:String(f.get('language')||'').trim(),description:cleanDescription(f.get('description')).trim(),metadataSource:previous?.metadataSource||'',pagesApproximate:previous?.pagesApproximate||false,pagesSource:previous?.pagesSource||'',currentPage:previous?.currentPage||0,progressPercent:previous?.progressPercent||0,started:previous?.started||'',seriesNumber:previous?.seriesNumber??null,wishlist:f.has('wishlist')};if(previous){if(typeof bsMarkEditedBook==='function')bsMarkEditedBook(id);books=books.map(x=>x.id===id?b:x);}else books.push(b);store();closeModal();go(document.querySelector('[data-nav].active')?.dataset.nav||'library');toast(previous?'Book updated!':'Book added!')}
 function detail(id){
  const b=books.find(x=>x.id===id);if(!b)return;
  $('modalTitle').textContent='Book details';
@@ -856,6 +859,7 @@ function bsQuickSave(event,id){
  const started=$('bs-quick-started').value,finished=$('bs-quick-finished').value;
  if(started&&finished&&finished<started){$('bs-quick-save-state').textContent='Finish date cannot be before start date.';return}
  const revised={...b,status,pages:total,currentPage:page,progressPercent:percent,rating,started,finished,notes:$('bs-quick-notes').value};
+ if(typeof bsMarkEditedBook==='function')bsMarkEditedBook(id);
  books=books.map(x=>x.id===id?revised:x);
  store();
  // Keep the detail modal visible while updating the library behind it.
@@ -866,8 +870,8 @@ function bsQuickSave(event,id){
  else if(active==='bookshelf')renderBookshelf();
  else if(active==='wishlist')renderWishlist();
  else if(active==='profile'&&typeof bsProfileRender==='function')bsProfileRender();
- $('bs-quick-save-state').textContent='✓ Saved locally. Your account will sync shortly.';
- toast('Reading updates saved ♡');
+ $('bs-quick-save-state').textContent='Saving on this device… The cloud status will update separately.';
+ toast('Reading update queued for saving ♡');
 }
 /* Series Tracker — groups by existing book metadata; never guesses missing books or total series length. */
 let bsSeriesExpanded=new Set();
@@ -2980,6 +2984,27 @@ async function bsAutoReadCloud(){
  return data;
 }
 /* v4: per-book sync, incremental batches, no bulk JSONB book uploads. */
+const BS_BOOK_DIRTY_KEY='blue-shelf-book-edits-v1:';
+function bsDirtyBookMap(){
+ if(!cloudUser)return {};
+ try{return JSON.parse(localStorage.getItem(BS_BOOK_DIRTY_KEY+cloudUser.id)||'{}')||{};}catch{return {}}
+}
+function bsMarkEditedBook(id){
+ if(!cloudUser||!id)return;
+ try{
+  const pending=bsDirtyBookMap();
+  pending[id]=Date.now();
+  localStorage.setItem(BS_BOOK_DIRTY_KEY+cloudUser.id,JSON.stringify(pending));
+ }catch(e){console.warn('Could not persist pending book edit marker',e)}
+}
+function bsClearSyncedBookEdits(batch){
+ if(!cloudUser)return;
+ try{
+  const pending=bsDirtyBookMap();
+  for(const [id,stamp] of batch)if(pending[id]===stamp)delete pending[id];
+  localStorage.setItem(BS_BOOK_DIRTY_KEY+cloudUser.id,JSON.stringify(pending));
+ }catch(e){console.warn('Could not clear synced book markers',e)}
+}
 const BS_BOOK_SYNC_VERSION='blue-shelf-book-hashes-v4:';
 function bsBookHash(b){
  const str=JSON.stringify(b);let h=2166136261;
@@ -3012,10 +3037,14 @@ async function bsAutoRun(forcePush=false){
  const revision=bsAutoChanges;
  try{
   await bsDurableInitialization;
+  await bsDurableQueue;
+  if(revision!==bsAutoChanges){bsAutoPending=true;return false;}
   const durable=await bsDurableRead();
+  if(revision!==bsAutoChanges){bsAutoPending=true;return false;}
   if(Array.isArray(durable?.books)&&durable.books.length>books.length)books=durable.books;
   const localBooks=books.filter(b=>b&&typeof b.id==='string'&&b.title);
   const prior=bsBookSyncMap();
+  const dirty=bsDirtyBookMap();
   const legacy=await bsAutoReadCloud();
   const legacyBooks=Array.isArray(legacy?.books)?legacy.books.filter(b=>b&&typeof b.id==='string'&&b.title):[];
   const cloudRows=await bsBookCloudAll();
@@ -3028,7 +3057,7 @@ async function bsAutoRun(forcePush=false){
   for(const b of localBooks){
    const remote=remoteById.get(b.id);
    const changedSinceLastSync=prior[b.id]&&prior[b.id]!==bsBookHash(b);
-   if(!remote||changedSinceLastSync){
+   if(!remote||changedSinceLastSync||dirty[b.id]){
     mergedMap.set(b.id,b);
     upload.set(b.id,b);
    }else if(!prior[b.id]&&localBooks.length>remoteById.size){
@@ -3041,7 +3070,19 @@ async function bsAutoRun(forcePush=false){
   for(const [id,b] of remoteById)if(!cloudRows.some(r=>r.book_id===id))upload.set(id,mergedMap.get(id));
   const merged=[...mergedMap.values()];
   if(merged.length<Math.max(localBooks.length,remoteById.size))throw Error('Refusing to shrink a library.');
+  // A new edit during cloud reads must not be replaced by this older merge.
+  if(revision!==bsAutoChanges){
+   bsAutoPending=true;
+   bsAutoCloudState('A newer book edit was detected. Restarting synchronization without overwriting it…');
+   return false;
+  }
   await bsDurableWrite(merged);
+  if(revision!==bsAutoChanges){
+   // Restore the latest live edits after the older queued snapshot, if needed.
+   await bsDurableWrite(books);
+   bsAutoPending=true;
+   return false;
+  }
   const verified=await bsDurableRead();
   if(!Array.isArray(verified?.books)||verified.books.length!==merged.length)throw Error('Local IndexedDB save verification failed.');
   books=merged;
@@ -3065,6 +3106,7 @@ async function bsAutoRun(forcePush=false){
    if(error)throw error;
    for(const b of batches[i])syncedMap[b.id]=bsBookHash(b);
    bsBookSyncSave(syncedMap);
+   bsClearSyncedBookEdits(batches[i].map(b=>[b.id,dirty[b.id]]));
    bsAutoCloudState('Saving books to your account: '+(i+1)+' / '+batches.length+' batches…');
   }
   const cloudCount=await bsBookCloudCount();
