@@ -109,7 +109,28 @@ const start=ui.querySelector('#bs-auto-genre-start');
 const feedback=ui.querySelector('#bs-auto-genre-feedback');
 const review=ui.querySelector('#bs-auto-genre-review');
 let scanning=false,proposals=[];
+const proposalStorage='blue-shelf-genre-proposals-v3';
+const proposalSignature=p=>String(p.id)+'|'+String(p.genre);
+function loadProposals(){
+ try{
+  const data=JSON.parse(sessionStorage.getItem(proposalStorage)||'[]');
+  if(!Array.isArray(data))return [];
+  const byId=new Map(books.map(b=>[b.id,b]));
+  return data.filter(p=>p&&typeof p.id==='string'&&typeof p.genre==='string'
+   &&byId.has(p.id)&&!String(byId.get(p.id).genre||'').trim()).slice(0,3000);
+ }catch{return []}
+}
+function persistProposals(){
+ try{sessionStorage.setItem(proposalStorage,JSON.stringify(proposals))}catch(e){console.warn('Could not cache review proposals',e)}
+}
+function addProposal(proposal){
+ if(!proposal||!proposal.id||!proposal.genre)return false;
+ if(proposals.some(x=>x.id===proposal.id))return false;
+ proposals.push(proposal);return true;
+}
+proposals=loadProposals();
 function draw(){
+ persistProposals();
  review.replaceChildren();
  for(let i=0;i<proposals.length;i++){
   const p=proposals[i],line=document.createElement('label');
@@ -141,18 +162,21 @@ function findMissing(){
  return books.filter(b=>b?.title&&!String(b.genre||'').trim());
 }
 function collectLocal(){
- proposals=[];const missing=findMissing(),found=new Set();
+ // Preserve proposals already found, including results of earlier searches.
+ proposals=loadProposals();
+ const missing=findMissing(),found=new Set(proposals.map(p=>p.id));
+ let added=0;
  for(const b of missing){
+  if(found.has(b.id))continue;
   const value=localBookGenre(b);
-  if(value&&!found.has(b.id)){
-   found.add(b.id);
-   proposals.push({id:b.id,title:b.title,genre:value.genre,source:value.source});
+  if(value&&addProposal({id:b.id,title:b.title,genre:value.genre,source:value.source})){
+   found.add(b.id);added++;
   }
  }
  draw();
- feedback.textContent='✓ Offline analysis: '+missing.length+' books checked · '+proposals.length+
-  ' suggested genres. No internet used. '+(proposals.length?'Review each match below before applying.':
-  'No clear genre evidence in the saved metadata; books were not guessed.');
+ feedback.textContent='✓ Analyzed '+missing.length+' books offline · '+proposals.length+
+  ' total suggestions ('+added+' newly found). '+(proposals.length?'Review these below before applying.':
+  'No clear genre evidence in the saved metadata. Online catalog results may remain unavailable.');
  return found;
 }
 start.addEventListener('click',()=>{
@@ -163,6 +187,32 @@ start.addEventListener('click',()=>{
   feedback.textContent='Could not analyze saved book descriptions: '+error.message;
  }
 });
+
+const actions=document.createElement('div');
+actions.className='bs-genre-export-actions';
+const exportButton=document.createElement('button');
+exportButton.type='button';exportButton.textContent='↓ Export unmatched book metadata';
+exportButton.title='Download titles, authors, ISBNs and book descriptions — no notes or EPUB files';
+exportButton.onclick=()=>{
+ try{
+  const items=findMissing().map(b=>({id:b.id,title:String(b.title||''),
+   author:String(b.author||''),isbn:String(b.isbn||''),
+   description:String(b.description||'').slice(0,2500)}));
+  const blob=new Blob([JSON.stringify({type:'blue-shelf-genre-research',version:1,books:items},null,2)],
+    {type:'application/json'});
+  const url=URL.createObjectURL(blob),link=document.createElement('a');
+  link.href=url;link.download='blue-shelf-missing-genres.json';
+  document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);
+  feedback.textContent='Exported '+items.length+' books missing genres. Includes titles, authors, ISBN and publisher descriptions, not private notes or ebook files.';
+ }catch(e){feedback.textContent='Could not export metadata: '+e.message}
+};
+actions.append(exportButton);
+ui.append(actions);
+style.textContent+='#bs-auto-genre-box .bs-genre-export-actions{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px}';
+if(proposals.length){
+ draw();
+ feedback.textContent=proposals.length+' earlier genre suggestions restored for review. They have not been saved to your library.';
+}
 const online=ui.querySelector('#bs-auto-genre-online');
 online.addEventListener('click',async()=>{
  if(scanning)return;
@@ -180,7 +230,7 @@ online.addEventListener('click',async()=>{
     const result=await onlineGenre(b);checked++;
     if(result){
      found.add(b.id);
-     proposals.push({id:b.id,title:b.title,genre:result.genre,source:result.source+' · review'});
+     addProposal({id:b.id,title:b.title,genre:result.genre,source:result.source+' · review'});
     }
     cached[b.id]={fingerprint:[b.title,b.author,b.isbn].join('|'),checkedAt:Date.now()};
    }catch(e){
