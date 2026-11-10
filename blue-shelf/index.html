@@ -3045,19 +3045,24 @@ async function bsBookCloudAll(){
  const key=BS_INCREMENTAL_CLOUD_KEY+cloudUser.id;
  let last='';try{last=localStorage.getItem(key)||''}catch{}
  const validLast=last&&Number.isFinite(Date.parse(last))&&Date.parse(last)<=Date.now();
- // Never assume a device owns the full collection from a count alone.
- const canDelta=!!validLast&&manifest.every(row=>byId.has(row.book_id)&&prior[row.book_id]);
+ // A verified watermark permits reusing already-synced books and
+ // fetching only missing or changed records, not the full catalog.
+ const canDelta=!!validLast;
  bsIncrementalSyncStart=Date.now();
  const out=canDelta?local.map(b=>({book_id:b.id,data:b})):[];
  if(canDelta){
   const since=Date.parse(last);
-  const changed=manifest.filter(row=>!row.updated_at||Date.parse(row.updated_at)>=since)
-   .map(row=>row.book_id);
+  const changed=manifest.filter(row=>
+    !byId.has(row.book_id)||!prior[row.book_id]||
+    !row.updated_at||!Number.isFinite(Date.parse(row.updated_at))||
+    Date.parse(row.updated_at)>=since
+  ).map(row=>row.book_id);
   for(let i=0;i<changed.length;i+=35){
+   const batch=changed.slice(i,i+35);
    const {data,error}=await supa.from('blue_shelf_books').select('book_id,data')
-    .eq('user_id',cloudUser.id).in('book_id',changed.slice(i,i+35));
+    .eq('user_id',cloudUser.id).in('book_id',batch);
    if(error)throw error;
-   if((data||[]).length!==changed.slice(i,i+35).length)throw Error('Cloud book list changed during sync. Please retry.');
+   if((data||[]).length!==batch.length)throw Error('Cloud book list changed during sync. Please retry.');
    out.push(...data);
   }
   // Newer remote rows override cached local rows without rewriting unchanged covers.
@@ -3201,7 +3206,7 @@ scheduleCloudSave=function(){
 };
 bsCloudStart=async function(){
  if(!supa||!cloudUser)return;
- if(bsAutoReady&&Date.now()-bsAutoLastCheck<15000)return;
+ if(bsAutoReady&&Date.now()-bsAutoLastCheck<300000&&!bsAutoPending)return;
  bsAutoReady=true;
  return bsAutoRun();
 };
