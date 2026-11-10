@@ -2969,6 +2969,7 @@ async function bsHandoffDownload(){
    Catalog sync is additive: no browser can accidentally shrink another browser's collection.
    EPUB/PDF files remain in the local My Files IndexedDB database. */
 let bsAutoBusy=false,bsAutoPending=false,bsAutoTimer=null,bsAutoReady=false;
+let bsAutoFailures=0,bsAutoRetryAfter=0;
 let bsAutoChanges=0,bsAutoSynced=0,bsAutoLastCheck=0,bsAutoLastError='';
 function bsAutoCloudState(message,error=false){
  bsAutoLastError=error?message:'';
@@ -3028,30 +3029,49 @@ function bsBookSyncSave(hashes){
 const BS_INCREMENTAL_CLOUD_KEY='blue-shelf-verified-cloud-time-v1:';
 let bsIncrementalSyncStart=0;
 async function bsBookCloudAll(){
+ // A small metadata manifest replaces repeated transfers of all inline cover images.
+ const manifest=[];let offset=0;
+ while(true){
+  const {data,error}=await supa.from('blue_shelf_books').select('book_id,updated_at')
+   .eq('user_id',cloudUser.id).order('book_id').range(offset,offset+699);
+  if(error)throw error;
+  manifest.push(...(data||[]));
+  if(!data||data.length<700)break;
+  offset+=700;
+ }
  const local=books.filter(b=>b&&typeof b.id==='string'&&b.title);
+ const byId=new Map(local.map(b=>[b.id,b]));
+ const prior=bsBookSyncMap();
  const key=BS_INCREMENTAL_CLOUD_KEY+cloudUser.id;
  let last='';try{last=localStorage.getItem(key)||''}catch{}
- const serverCount=await bsBookCloudCount();
- const prior=bsBookSyncMap();
- const canDelta=!!last&&Number.isFinite(Date.parse(last))&&
-   Date.parse(last)<=Date.now()&&local.length>=serverCount&&
-   Object.keys(prior).length>=serverCount;
- const out=canDelta?local.map(b=>({book_id:b.id,data:b})):[];
- let start=0;
+ const validLast=last&&Number.isFinite(Date.parse(last))&&Date.parse(last)<=Date.now();
+ // Never assume a device owns the full collection from a count alone.
+ const canDelta=!!validLast&&manifest.every(row=>byId.has(row.book_id)&&prior[row.book_id]);
  bsIncrementalSyncStart=Date.now();
- while(true){
-  let request=supa.from('blue_shelf_books')
-    .select('book_id,data').eq('user_id',cloudUser.id);
-  if(canDelta)request=request.gte('updated_at',last);
-  const {data,error}=await request.order('book_id').range(start,start+49);
-  if(error)throw error;
-  out.push(...(data||[]));if(!data||data.length<50)break;
-  start+=50;
- }
- // Deduplicate: fresh cloud values always override the local baseline.
+ const out=canDelta?local.map(b=>({book_id:b.id,data:b})):[];
  if(canDelta){
-  const unique=new Map(out.map(row=>[row.book_id,row]));
-  return [...unique.values()];
+  const since=Date.parse(last);
+  const changed=manifest.filter(row=>!row.updated_at||Date.parse(row.updated_at)>=since)
+   .map(row=>row.book_id);
+  for(let i=0;i<changed.length;i+=35){
+   const {data,error}=await supa.from('blue_shelf_books').select('book_id,data')
+    .eq('user_id',cloudUser.id).in('book_id',changed.slice(i,i+35));
+   if(error)throw error;
+   if((data||[]).length!==changed.slice(i,i+35).length)throw Error('Cloud book list changed during sync. Please retry.');
+   out.push(...data);
+  }
+  // Newer remote rows override cached local rows without rewriting unchanged covers.
+  return [...new Map(out.map(row=>[row.book_id,row])).values()];
+ }
+ // Recovery or first connection: full download is necessary only until verified.
+ let start=0;
+ while(true){
+  const {data,error}=await supa.from('blue_shelf_books').select('book_id,data')
+   .eq('user_id',cloudUser.id).order('book_id').range(start,start+49);
+  if(error)throw error;
+  out.push(...(data||[]));
+  if(!data||data.length<50)break;
+  start+=50;
  }
  return out;
 }
@@ -3061,6 +3081,7 @@ async function bsBookCloudCount(){
 }
 async function bsAutoRun(forcePush=false){
  if(bsAutoBusy||!supa||!cloudUser)return false;
+ if(!forcePush&&Date.now()<bsAutoRetryAfter)return false;
  bsAutoBusy=true;
  const revision=bsAutoChanges;
  try{
@@ -3073,9 +3094,11 @@ async function bsAutoRun(forcePush=false){
   const localBooks=books.filter(b=>b&&typeof b.id==='string'&&b.title);
   const prior=bsBookSyncMap();
   const dirty=bsDirtyBookMap();
-  const legacy=await bsAutoReadCloud();
-  const legacyBooks=Array.isArray(legacy?.books)?legacy.books.filter(b=>b&&typeof b.id==='string'&&b.title):[];
   const cloudRows=await bsBookCloudAll();
+  // Read the old backup only for accounts not yet migrated to per-book records.
+  // Its embedded cover images otherwise cause repeated unnecessary egress.
+  const legacy=cloudRows.length<100?await bsAutoReadCloud():null;
+  const legacyBooks=Array.isArray(legacy?.books)?legacy.books.filter(b=>b&&typeof b.id==='string'&&b.title):[];
   const remoteById=new Map(cloudRows.filter(x=>x&&x.data&&x.book_id).map(x=>[x.book_id,x.data]));
   // Seed records from the original cloud format without ever clearing that format.
   for(const b of legacyBooks)if(!remoteById.has(b.id))remoteById.set(b.id,b);
@@ -3145,18 +3168,24 @@ async function bsAutoRun(forcePush=false){
   bsAutoSynced=revision;
   if(revision===bsAutoChanges)bsAutoPending=false;
   bsAutoLastCheck=Date.now();
+  bsAutoFailures=0;bsAutoRetryAfter=0;
   // Save only after all cloud/local checks succeed. Overlap five minutes to
   // protect against network latency and small client/server clock differences.
   try{localStorage.setItem(BS_INCREMENTAL_CLOUD_KEY+cloudUser.id,new Date(Math.max(0,bsIncrementalSyncStart-300000)).toISOString())}catch{}
   bsAutoCloudState('✓ '+cloudCount+' books saved on your account · '+new Date().toLocaleTimeString());
   return true;
  }catch(e){
+  bsAutoFailures=Math.min(8,bsAutoFailures+1);
+  bsAutoRetryAfter=Date.now()+Math.min(3600000,300000*Math.pow(2,bsAutoFailures-1));
   bsAutoCloudState('⚠️ Cloud synchronization not confirmed: '+(e.message||e)+'. Local books remain safe; keep your backup.',true);
   console.error('Blue Shelf incremental sync',e);
   return false;
  }finally{
   bsAutoBusy=false;
-  if(bsAutoPending){clearTimeout(bsAutoTimer);bsAutoTimer=setTimeout(()=>bsAutoRun(),10000);}
+  if(bsAutoPending){
+   clearTimeout(bsAutoTimer);
+   bsAutoTimer=setTimeout(()=>bsAutoRun(),Math.max(10000,bsAutoRetryAfter-Date.now()));
+  }
  }
 }
 function bsAutoQueue(delay=3500){
@@ -3188,7 +3217,7 @@ cloudDownload=async function(){return bsAutoRun()};
 window.bsAutoSyncNow=async function(){
  if(!cloudUser||!supa){bsAutoCloudState('Sign in to Blue Shelf to synchronize your account.');return}
  clearTimeout(bsAutoTimer);
- await bsAutoRun();
+ await bsAutoRun(true);
 };
 // Startup: the original gate and connection are asynchronous. Wait for the signed-in
 // Supabase session and durable IndexedDB load, then reconcile once automatically.
@@ -3216,10 +3245,8 @@ async function bsInspectSync(){
  if(!supa||!cloudUser){if(node)node.textContent='Account: not signed in';return}
  try{
   const count=await bsBookCloudCount();
-  const legacy=await bsAutoReadCloud();
-  const older=Array.isArray(legacy?.books)?legacy.books.length:0;
-  if(node)node.textContent='Account: '+Math.max(count,older)+' books';
-  bsSyncSetDetail('Synced individually: '+count+' books · Legacy backup: '+older+' books · Original EPUB/PDF files stay on this device.');
+  if(node)node.textContent='Account: '+count+' books';
+  bsSyncSetDetail('Synced individually: '+count+' books · Legacy backup not downloaded during routine checks · Original EPUB/PDF files stay on this device.');
  }catch(e){bsSyncSetDetail('Cannot verify account: '+(e.message||e)+'. Keep local books and backup.')}
 }
 // Keep metadata maintenance in the backup area if another render path moves it.
