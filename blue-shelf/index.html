@@ -3021,13 +3021,35 @@ function bsBookSyncMap(){
 function bsBookSyncSave(hashes){
  try{localStorage.setItem(BS_BOOK_SYNC_VERSION+cloudUser.id,JSON.stringify(hashes))}catch(e){console.warn('Cannot persist sync index',e)}
 }
+/* Egress-safe syncing: after a verified full download, query only rows changed
+   since the previous successful sync. IndexedDB keeps covers locally. */
+const BS_INCREMENTAL_CLOUD_KEY='blue-shelf-verified-cloud-time-v1:';
+let bsIncrementalSyncStart=0;
 async function bsBookCloudAll(){
- const out=[];let start=0;
+ const local=books.filter(b=>b&&typeof b.id==='string'&&b.title);
+ const key=BS_INCREMENTAL_CLOUD_KEY+cloudUser.id;
+ let last='';try{last=localStorage.getItem(key)||''}catch{}
+ const serverCount=await bsBookCloudCount();
+ const prior=bsBookSyncMap();
+ const canDelta=!!last&&Number.isFinite(Date.parse(last))&&
+   Date.parse(last)<=Date.now()&&local.length>=serverCount&&
+   Object.keys(prior).length>=serverCount;
+ const out=canDelta?local.map(b=>({book_id:b.id,data:b})):[];
+ let start=0;
+ bsIncrementalSyncStart=Date.now();
  while(true){
-  const {data,error}=await supa.from('blue_shelf_books').select('book_id,data').eq('user_id',cloudUser.id).order('book_id').range(start,start+49);
+  let request=supa.from('blue_shelf_books')
+    .select('book_id,data').eq('user_id',cloudUser.id);
+  if(canDelta)request=request.gte('updated_at',last);
+  const {data,error}=await request.order('book_id').range(start,start+49);
   if(error)throw error;
   out.push(...(data||[]));if(!data||data.length<50)break;
   start+=50;
+ }
+ // Deduplicate: fresh cloud values always override the local baseline.
+ if(canDelta){
+  const unique=new Map(out.map(row=>[row.book_id,row]));
+  return [...unique.values()];
  }
  return out;
 }
@@ -3121,6 +3143,9 @@ async function bsAutoRun(forcePush=false){
   bsAutoSynced=revision;
   if(revision===bsAutoChanges)bsAutoPending=false;
   bsAutoLastCheck=Date.now();
+  // Save only after all cloud/local checks succeed. Overlap five minutes to
+  // protect against network latency and small client/server clock differences.
+  try{localStorage.setItem(BS_INCREMENTAL_CLOUD_KEY+cloudUser.id,new Date(Math.max(0,bsIncrementalSyncStart-300000)).toISOString())}catch{}
   bsAutoCloudState('✓ '+cloudCount+' books saved on your account · '+new Date().toLocaleTimeString());
   return true;
  }catch(e){
@@ -3153,7 +3178,7 @@ bsCloudRead=async function(){return bsAutoRun()};
 bsCloudPush=async function(){return bsAutoRun(true)};
 bsCloudCheck=async function(){
  if(document.visibilityState==='hidden'||!supa||!cloudUser||bsAutoBusy)return;
- if(Date.now()-bsAutoLastCheck<600000)return;
+ if(Date.now()-bsAutoLastCheck<3600000)return;
  await bsAutoRun();
 };
 cloudUpload=async function(){return bsAutoRun(true)};
